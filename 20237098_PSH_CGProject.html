@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <title>20237098 박상현</title>
+        <style>
+            body {
+                margin: 0;
+                padding: 0;
+                overflow: hidden;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="myMenu"><center>
+
+        </center></div>
+        <canvas id="glCanvas"></canvas>
+        <script type="text/javascript" src="shaders/initShaders2.js"></script>
+        <script type="text/javascript" src="MV.js"></script>
+        <script type="module">
+            var gl;
+            let vertices = [];
+            // var vertexCount = 0;
+            // 면마다 텍스처 좌표가 다르기 때문에 인덱스를 통해서 그릴 수 없음 -> 따라서 인덱스 사용 불가
+            var CubeVertexCount = 0, PillarVertexCount = 0, mapVertexCount = 0, theta = 45;
+            var eye = vec3(0, 1, 0), at = vec3(1, 1, 1), cameraVec = vec3(0, -0.4472, -0.8944); // 0.57735 == 1.0/Math.sqrt(3)
+
+            var groundProgram, playerProgram;
+            var worldMatrix, viewMatrix, projectMatrix;
+            var worldMatLoc, viewMatLoc, projMatLoc, texImageLoc;
+            var worldMatLoc2, viewMatLoc2, projMatLoc2;
+
+            var eyePosLoc, matShLoc, matSpecLoc, matAmbiLoc, matEmitLoc, lightDirLoc;
+            var shiniess = 100;
+            var lightDir = vec3(2, 2, 2);
+
+            let srcDiffColor = [1, 1, 1];
+
+            generateModel();
+            init();
+            render();
+
+            function init() {
+                var canvas = document.getElementById('glCanvas');
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight - document.getElementById('myMenu').offsetHeight;
+
+                gl = canvas.getContext('webgl2', {antialias: false});
+                if(!gl) {
+                    alert("WebGL 2 is not available!");
+                    return;
+                }
+
+                // Configure WebGL
+                gl.viewport(0, 0, canvas.width, canvas.height);
+                gl.clearColor(0.2, 0.2, 0.2, 1.0);
+
+                // Enable hidden surface removal
+                gl.enable(gl.DEPTH_TEST);
+
+                // Load shaders and initialize attribute buffers
+                playerProgram = initShaders(gl, "shaders/light_tex_vert.glsl", "shaders/light_tex_frag.glsl");
+                gl.useProgram(playerProgram);
+
+                // Load the data into the GPU
+                var vbufferId = gl.createBuffer();
+                gl.bindBuffer(gl.ARRAY_BUFFER, vbufferId);
+                gl.bufferData(gl.ARRAY_BUFFER, flatten(vertices), gl.STATIC_DRAW);
+
+                gl.enableVertexAttribArray(0);
+                gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 32, 0);
+
+                gl.enableVertexAttribArray(1);
+                gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 32, 12)
+
+                gl.enableVertexAttribArray(2);
+                gl.vertexAttribPointer(2, 2, gl.FLOAT, false, 32, 24);
+
+                worldMatrix = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
+                worldMatLoc = gl.getUniformLocation(playerProgram, "worldMat");
+                gl.uniformMatrix4fv(worldMatLoc, false, worldMatrix);
+
+                viewMatrix = lookAt(vec3(2, 2, 2), vec3(0, 0, 0), vec3(0, 1, 0));
+                viewMatLoc = gl.getUniformLocation(playerProgram, "viewMat");
+                gl.uniformMatrix4fv(viewMatLoc, false, flatten(viewMatrix));
+                
+                // 3D perspective viewing
+                var aspectRatio = canvas.width / canvas.height;
+                projectMatrix = perspective(90, aspectRatio, 0.001, 1000);
+                projMatLoc = gl.getUniformLocation(playerProgram, "projMat");
+                gl.uniformMatrix4fv(projMatLoc, false, flatten(projectMatrix));
+
+                // activetexture를 통해서 함수의 매개변수로 입력되는 텍스처는 번호를 통해서 구분한다 gl.TEXTURE0 , 1, 2 같이 뒤에 붙은 번호로 구분함
+
+                texImageLoc = gl.getUniformLocation(playerProgram, "texImage");
+                loadTexture("Images/logo.bmp", gl.TEXTURE0);
+                loadTexture("Images/crate.bmp", gl.TEXTURE1);
+                loadTexture("Images/monalisa.bmp", gl.TEXTURE2);
+                loadTexture("Images/brick.bmp", gl.TEXTURE3);
+
+		        // var imageTex = new Image(); // 이미지를 읽어오는 코드
+                // imageTex.src = "Images/logo.bmp"; // 같은 폴더 내에 있는 이미지의 위치
+                // imageTex.onload = function() { // 이 이미지를 읽어들일 때 실행되는 콜백함수
+                //     var textureID = gl.createTexture(); // 텍스처 ID 생성
+                //     gl.activeTexture(gl.TEXTURE0);
+                //     gl.bindTexture(gl.TEXTURE_2D, textureID); // 2D 텍스처
+                //     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, imageTex);
+                //     gl.generateMipmap(gl.TEXTURE_2D); 
+                //     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+                //     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+                //     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.MIRRORED_REPEAT);
+                // }
+
+                function loadTexture(src, textureUnit){
+                    var imageTex = new Image();
+                    imageTex.src = src;
+                    imageTex.onload = function(){
+                        var textureID = gl.createTexture();
+                        gl.activeTexture(textureUnit);
+                        gl.bindTexture(gl.TEXTURE_2D, textureID);
+                        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, imageTex);
+                        gl.generateMipmap(gl.TEXTURE_2D);
+                        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+                        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+                        // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.MIRRORED_REPEAT);
+                        // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.MIRRORED_REPEAT);
+                    }
+                }
+                
+                eyePosLoc = gl.getUniformLocation(playerProgram, "eyePos");
+                gl.uniform3fv(eyePosLoc, flatten(eye), 0);
+
+                matShLoc = gl.getUniformLocation(playerProgram, "matSh");
+                gl.uniform1f(matShLoc, shiniess);
+
+                lightDirLoc = gl.getUniformLocation(playerProgram, "lightDir");
+                gl.uniform3fv(lightDirLoc, flatten(lightDir), 0);
+
+                matSpecLoc = gl.uniform3f(gl.getUniformLocation(playerProgram, "matSpec"), 1, 1, 1);
+                matAmbiLoc = gl.uniform3f(gl.getUniformLocation(playerProgram, "matAmbi"), 0.2, 0.2, 0.2);
+                matEmitLoc = gl.uniform3f(gl.getUniformLocation(playerProgram, "matEmit"), 0, 0, 0);
+
+                gl.uniform3f(gl.getUniformLocation(playerProgram, "srcDiff"), 1, 1, 1);
+                gl.uniform3f(gl.getUniformLocation(playerProgram, "srcSpec"), 1, 1, 1);
+                gl.uniform3f(gl.getUniformLocation(playerProgram, "srcAmbi"), 1, 1, 1);
+                gl.uniform3f(gl.getUniformLocation(playerProgram, "lightDir"), 1, 1, 1);
+
+                groundProgram = initShaders(gl, "shaders/uniform_color_vert.glsl", "shaders/uniform_color_frag.glsl");
+                gl.useProgram(groundProgram);
+
+                worldMatLoc2 = gl.getUniformLocation(groundProgram, "worldMat");
+                gl.uniformMatrix4fv(worldMatLoc2, false, worldMatrix);
+
+                viewMatLoc2 = gl.getUniformLocation(groundProgram, "viewMat");
+                gl.uniformMatrix4fv(viewMatLoc2, false, flatten(viewMatrix));
+
+                projMatLoc2 = gl.getUniformLocation(groundProgram, "projMat");
+                gl.uniformMatrix4fv(projMatLoc2, false, flatten(projectMatrix));
+
+                gl.uniform4f(gl.getUniformLocation(groundProgram, "uColor"), 0, 0, 1, 0.5);
+
+                var sinTheta = Math.sin(0.1);
+                var cosTheta = Math.cos(0.1);
+
+                window.onkeydown = function(event){
+                    var key = String.fromCharCode(event.keyCode);
+                    switch (key){
+                        case 'W' :
+                            var newPosX = eye[0] + 0.5 * cameraVec[0];
+                            var newPosZ = eye[2] + 0.5 * cameraVec[2];
+                            if (newPosX > -10 && newPosX < 10 && newPosZ > -10 && newPosZ < 10 ) {
+                                eye[0] = newPosX;
+                                eye[2] = newPosZ;
+                            }
+                            break;
+                        case 'A' :
+                            var newVecX =  cosTheta*cameraVec[0] + sinTheta*cameraVec[2];
+                            var newVecZ = -sinTheta*cameraVec[0] + cosTheta*cameraVec[2];
+                            cameraVec[0] = newVecX;
+                            cameraVec[2] = newVecZ;
+                            break;
+                        case 'S' :
+                            var newPosX = eye[0] - 0.5 * cameraVec[0];
+                            var newPosZ = eye[2] - 0.5 * cameraVec[2];
+                            if (newPosX > -10 && newPosX < 10 && newPosZ > -10 && newPosZ < 10 ) {
+                                eye[0] = newPosX;
+                                eye[2] = newPosZ;
+                            }
+                            break;
+                        case 'D' :
+                            var newVecX = cosTheta*cameraVec[0] - sinTheta*cameraVec[2];
+                            var newVecZ = sinTheta*cameraVec[0] + cosTheta*cameraVec[2];
+                            cameraVec[0] = newVecX;
+                            cameraVec[2] = newVecZ;
+                            break;
+                    }
+                }
+
+                window.onresize = function() {
+                    canvas.width = window.innerWidth;
+                    canvas.height = window.innerHeight - document.getElementById('myMenu').offsetHeight;
+                    gl.viewport(0, 0, canvas.width, canvas.height);
+
+                    // 3D perspective viewing
+                    var aspectRatio = canvas.width / canvas.height;
+                    projectMatrix = perspective(90, aspectRatio, 0.001, 1000);
+                    gl.uniformMatrix4fv(projMatLoc, false, flatten(projectMatrix));
+                };
+            }
+
+            function render() {
+                gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+                at[0] = eye[0] + cameraVec[0];
+                at[1] = eye[1] + cameraVec[1];
+                at[2] = eye[2] + cameraVec[2];
+                viewMatrix = lookAt(eye, at, vec3(0, 1, 0));    
+                gl.useProgram(playerProgram);
+                gl.uniformMatrix4fv(viewMatLoc, false, flatten(viewMatrix));
+                
+                // 체스 판 렌더링
+                gl.useProgram(groundProgram);
+                for (let row = 0; row < 25; row++) {
+                    for (let col = 0; col < 25; col++) {
+
+                        // translate를 이용해 오브젝트가 어디서부터 그려질 것인지 결정
+                        // 이 경우 (col, -1, row) 좌표부터 시작해 반복문을 돌면서 그곳에 오브젝트를 그려낸다
+                        worldMatrix = translate(col * 2 - 8, -1, row * 2 - 8);
+                        gl.uniformMatrix4fv(viewMatLoc2, false, flatten(viewMatrix));
+                        gl.uniformMatrix4fv(worldMatLoc2, false, flatten(worldMatrix));
+                        
+                        // 체크 패턴: 짝수면 밝은색, 홀수면 어두운색
+                        if ((row + col) % 2 === 0) {
+                            gl.uniform4f(gl.getUniformLocation(groundProgram, "uColor"), 0, 0, 0, 1);  // 검은색
+                        } else {
+                            gl.uniform4f(gl.getUniformLocation(groundProgram, "uColor"), 1, 1, 1, 1);    // 하얀색
+                        }
+                        
+                        gl.drawArrays(gl.TRIANGLES, CubeVertexCount + PillarVertexCount, mapVertexCount);
+                    }
+                }
+
+                // 체스 판 테두리 렌더링
+                
+                // 이후에 오브젝트를 추가하는 경우 CubeVertexCount PillarVertexCount mapVertexCount 값을 모두 더한 이후부터
+                // 오브젝트를 그리기 시작하면 된다
+
+                gl.useProgram(playerProgram);
+
+                window.requestAnimationFrame(render);
+
+                // uniform1i에서 방금 지정한 그림의 번호 0,1가 어떤 그림을 가지고 있는지 알고 두 번째 매개변수에 번호를 넣어서 해당 번호에 해당하는 그림을 렌더링할 수 있다
+                // TEXTURE0 -> 0 입력 (한림대 로고), TEXTURE1 -> 1 입력
+            }
+
+            function generateModel() { 
+                
+                generateGround();
+
+            }
+
+            function generateGround(){  // 맵 바닥
+                const mapGround_pos = [
+                    vec3(0, 0, 0),   // 오른쪽 아래 좌표
+                    vec3(2, 0, 0),   // 왼쪽 아래
+                    vec3(2, 0, 2),   // 왼쪽 위
+                    vec3(0, 0, 2)    // 오른쪽 위
+                ];
+                const mapGround_n = vec3(0, 1, 0);  
+                // 법선 벡터 - 이 표면이 어디를 향할 것인지 알려줌 - 바닥이기 때문에 위로 향하는 법선 벡터만 있으면 됨
+                const mapGround_uv = [vec2(0, 0), vec2(1, 0), vec2(1, 1), vec2(0, 1)];
+
+                // 삼각형 1: (0, 1, 2)
+                vertices.push(mapGround_pos[0]); 
+                vertices.push(mapGround_n); 
+                vertices.push(mapGround_uv[0]); mapVertexCount++;
+                vertices.push(mapGround_pos[1]); 
+                vertices.push(mapGround_n); 
+                vertices.push(mapGround_uv[1]); mapVertexCount++;
+                vertices.push(mapGround_pos[2]); 
+                vertices.push(mapGround_n); 
+                vertices.push(mapGround_uv[2]); mapVertexCount++;
+                // 삼각형 2: (0, 2, 3)
+                vertices.push(mapGround_pos[0]); 
+                vertices.push(mapGround_n); 
+                vertices.push(mapGround_uv[0]); mapVertexCount++;
+                vertices.push(mapGround_pos[2]); 
+                vertices.push(mapGround_n); 
+                vertices.push(mapGround_uv[2]); mapVertexCount++;
+                vertices.push(mapGround_pos[3]); 
+                vertices.push(mapGround_n); 
+                vertices.push(mapGround_uv[3]); mapVertexCount++;
+            }
+
+            function generateWall(){ // 맵 벽
+                const mapWall_pos = [
+                    vec3(0, 0, 0),   // 오른쪽 아래 좌표
+                    vec3(2, 0, 0),   // 왼쪽 아래
+                    vec3(2, 0, 2),   // 왼쪽 위
+                    vec3(0, 0, 2)    // 오른쪽 위
+                ];
+
+                const mapWall_uv = [vec2(0, 0), vec2(1, 0), vec2(1, 1), vec2(0, 1)];
+                
+            }
+
+            function generateCeiling(){ // 맵 천장
+                const mapCeiling_pos = [
+                    vec3(0, 0, 0),   // 오른쪽 아래 좌표
+                    vec3(2, 0, 0),   // 왼쪽 아래
+                    vec3(2, 0, 2),   // 왼쪽 위
+                    vec3(0, 0, 2)    // 오른쪽 위
+                ];
+
+                const mapCeiling_downNormal = vec3(0, -1, 0); // 천장이기 때문에 아래로 향하는 법선 벡터만 있으면 됨
+                const mapCeiling_uv = [vec2(0, 0), vec2(1, 0), vec2(1, 1), vec2(0, 1)];
+            }
+        </script>
+    </body>
+</html>

@@ -24,7 +24,7 @@
             // var vertexCount = 0;
             // 면마다 텍스처 좌표가 다르기 때문에 인덱스를 통해서 그릴 수 없음 -> 따라서 인덱스 사용 불가
             var wallVertexCount = 0, PillarVertexCount = 0, mapVertexCount = 0, theta = 45;
-            var eye = vec3(4, 1, 2), at = vec3(0, 0, 0), cameraVec = vec3(0, -0.4472, -0.8944); // 0.57735 == 1.0/Math.sqrt(3)
+            var eye = vec3(2, 1, 2), at = vec3(0, 0, 0), cameraVec = vec3(0, -0.4472, -0.8944); // 0.57735 == 1.0/Math.sqrt(3)
 
             var mainProgram, wallProgram;
             var worldMatrix, viewMatrix, projectMatrix;
@@ -259,12 +259,41 @@
                 gl.useProgram(wallProgram);
                 gl.uniformMatrix4fv(viewMatLoc, false, flatten(viewMatrix));
                 // 벽 렌더링
-                for (let row = 0; row < 27; row++) {
-                    worldMatrix = translate(0, -1, -2 + row * 2);
-                    gl.uniformMatrix4fv(worldMatLoc, false, flatten(worldMatrix));
-                    gl.drawArrays(gl.TRIANGLES, mapVertexCount, wallVertexCount);
+                // 오른쪽 전체 면 렌더링
+                for (let row = 0; row < 26; row++) {
+                    for(let height = -1; height < 1; height++){
+                        worldMatrix = translate(-2, height, -2 + row * 2);
+                        gl.uniformMatrix4fv(worldMatLoc, false, flatten(worldMatrix));
+                        gl.drawArrays(gl.TRIANGLES, mapVertexCount, wallVertexCount);
+                    }
+                }
+                
+                // 아래 전체 면 렌더링
+                for (let col = 0; col < 26; col++){
+                    for(let height = -1; height < 1; height++){
+                        worldMatrix = translate(-2 + col * 2, height, -2);
+                        gl.uniformMatrix4fv(worldMatLoc, false, flatten(worldMatrix));
+                        gl.drawArrays(gl.TRIANGLES, mapVertexCount, wallVertexCount);
+                    }
                 }
 
+                // 왼쪽 전체 면 렌더링
+                for (let row = 0; row < 26; row++) {
+                    for(let height = -1; height < 1; height++){
+                        worldMatrix = translate(50, height, -2 + row * 2);
+                        gl.uniformMatrix4fv(worldMatLoc, false, flatten(worldMatrix));
+                        gl.drawArrays(gl.TRIANGLES, mapVertexCount, wallVertexCount);
+                    }
+                }
+
+                // 위 전체 면 렌더링
+                for (let col = 0; col < 26; col++){
+                    for(let height = -1; height < 1; height++){
+                        worldMatrix = translate(-2 + col * 2, height, 50);
+                        gl.uniformMatrix4fv(worldMatLoc, false, flatten(worldMatrix));
+                        gl.drawArrays(gl.TRIANGLES, mapVertexCount, wallVertexCount);
+                    }
+                }
                 
                 window.requestAnimationFrame(render);
 
@@ -322,6 +351,8 @@
             }
 
             function generateWall(){ // 맵 벽
+                // 왼쪽, 위, 앞 면을 제외한 오른쪽, 아래 면은 보이지 않고, 뒷 면은 삼각형 하나만 렌더링되는 문제
+                // 법선 벡터 계산이 잘못되어있기 때문인 것으로 보임
                 const mapWall_pos = [
                     vec3(0, 0, 0),  // 바닥 오른쪽 아래 좌표
                     vec3(2, 0, 0),  //      왼쪽 아래
@@ -335,42 +366,43 @@
 
                 const mapWall_uv = [vec2(0, 0), vec2(1, 0), vec2(1, 1), vec2(0, 1)];
 
-                texQuadTangent(0, 3, 7, 4, 0, 1, 1);    // right == +yz plane
-                texQuadTangent(1, 0, 4, 5, 1, 1, 0);    // back == -xy plane
-                texQuadTangent(1, 5, 6, 2, 0, 1, 1);    // left == -yz plane
-                texQuadTangent(2, 6, 7, 3, 1, 1, 0);    // front == +xy plane
-                texQuadTangent(1, 2, 3, 0, 1, 0, 1);    // bottom == -zx plane
-                texQuadTangent(6, 5, 4, 7, 1, 0, 1);    // top == +zx plane
+                // 각 면에 해당하는 법선 벡터를 따로 구해서 할당한다
+                texQuadTangent(0, 3, 7, 4,  1, 0, 0,  0, 1, 1);    // right == +yz plane 오른쪽 면은 -x 축 방향으로 향하는 법선 벡터
+                texQuadTangent(1, 0, 4, 5,  0, 0, 1,  1, 1, 0);    // back == -xy plane 뒷 면은 
+                texQuadTangent(1, 5, 6, 2,  1, 0, 0,  0, 1, 1);    // left == -yz plane
+                texQuadTangent(2, 6, 7, 3,  0, 0, 1,  1, 1, 0);    // front == +xy plane
+                texQuadTangent(1, 2, 3, 0,  0, 1, 0,  1, 0, 1);    // bottom == -zx plane
+                texQuadTangent(6, 5, 4, 7,  0, 1, 0,  1, 0, 1);    // top == +zx plane
 
-                function texQuadTangent(a, b, c, d, vx, vy, vz) {
+                function texQuadTangent(a, b, c, d, nx, ny, nz, vx, vy, vz) {
                     // two triangles (a, b, c) and (a, c, d)
                     vertices.push(mapWall_pos[a]);
-                    vertices.push(mapWall_pos[a]);    
+                    vertices.push(vec3(nx, ny, nz));    
                     vertices.push(mapWall_uv[0]);      
                     vertices.push(vec3(vx, vy, vz)); wallVertexCount++;
 
                     vertices.push(mapWall_pos[b]);
-                    vertices.push(mapWall_pos[b]);     
+                    vertices.push(vec3(nx, ny, nz));     
                     vertices.push(mapWall_uv[1]);      
                     vertices.push(vec3(vx, vy, vz)); wallVertexCount++;
 
                     vertices.push(mapWall_pos[c]);
-                    vertices.push(mapWall_pos[c]);   
+                    vertices.push(vec3(nx, ny, nz));   
                     vertices.push(mapWall_uv[2]);      
                     vertices.push(vec3(vx, vy, vz)); wallVertexCount++;
 
                     vertices.push(mapWall_pos[a]);
-                    vertices.push(mapWall_pos[a]);  
+                    vertices.push(vec3(nx, ny, nz));  
                     vertices.push(mapWall_uv[0]);      
                     vertices.push(vec3(vx, vy, vz)); wallVertexCount++;
 
                     vertices.push(mapWall_pos[c]);
-                    vertices.push(mapWall_pos[c]);   
+                    vertices.push(vec3(nx, ny, nz));   
                     vertices.push(mapWall_uv[2]);      
                     vertices.push(vec3(vx, vy, vz)); wallVertexCount++;
 
                     vertices.push(mapWall_pos[d]);
-                    vertices.push(mapWall_pos[d]);   
+                    vertices.push(vec3(nx, ny, nz));   
                     vertices.push(mapWall_uv[3]);      
                     vertices.push(vec3(vx, vy, vz)); wallVertexCount++;
                 }

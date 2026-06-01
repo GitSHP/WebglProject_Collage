@@ -261,7 +261,7 @@
                 // 벽 렌더링
                 // 오른쪽 전체 면 렌더링
                 for (let row = 0; row < 26; row++) {
-                    for(let height = -1; height < 1; height++){
+                    for(let height = -1; height <= 1; height += 2){
                         worldMatrix = translate(-2, height, -2 + row * 2);
                         gl.uniformMatrix4fv(worldMatLoc, false, flatten(worldMatrix));
                         gl.drawArrays(gl.TRIANGLES, mapVertexCount, wallVertexCount);
@@ -270,7 +270,7 @@
                 
                 // 아래 전체 면 렌더링
                 for (let col = 0; col < 26; col++){
-                    for(let height = -1; height < 1; height++){
+                    for(let height = -1; height <= 1; height += 2){
                         worldMatrix = translate(-2 + col * 2, height, -2);
                         gl.uniformMatrix4fv(worldMatLoc, false, flatten(worldMatrix));
                         gl.drawArrays(gl.TRIANGLES, mapVertexCount, wallVertexCount);
@@ -279,7 +279,7 @@
 
                 // 왼쪽 전체 면 렌더링
                 for (let row = 0; row < 26; row++) {
-                    for(let height = -1; height < 1; height++){
+                    for(let height = -1; height <= 1; height += 2){
                         worldMatrix = translate(50, height, -2 + row * 2);
                         gl.uniformMatrix4fv(worldMatLoc, false, flatten(worldMatrix));
                         gl.drawArrays(gl.TRIANGLES, mapVertexCount, wallVertexCount);
@@ -288,7 +288,7 @@
 
                 // 위 전체 면 렌더링
                 for (let col = 0; col < 26; col++){
-                    for(let height = -1; height < 1; height++){
+                    for(let height = -1; height <= 1; height += 2){
                         worldMatrix = translate(-2 + col * 2, height, 50);
                         gl.uniformMatrix4fv(worldMatLoc, false, flatten(worldMatrix));
                         gl.drawArrays(gl.TRIANGLES, mapVertexCount, wallVertexCount);

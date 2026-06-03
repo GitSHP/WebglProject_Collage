@@ -23,8 +23,9 @@
             let vertices = [];
             // var vertexCount = 0;
             // 면마다 텍스처 좌표가 다르기 때문에 인덱스를 통해서 그릴 수 없음 -> 따라서 인덱스 사용 불가
-            var wallVertexCount = 0, PillarVertexCount = 0, mapVertexCount = 0, theta = 45;
-            var eye = vec3(2, 1, 2), at = vec3(0, 0, 0), cameraVec = vec3(0, -0.4472, -0.8944); // 0.57735 == 1.0/Math.sqrt(3)
+            var wallVertexCount = 0, CeilingVertexCount = 0, mapVertexCount = 0, theta = 45;
+            var eye = vec3(1, 1, 2), at = vec3(0, 0, 0), cameraVec = vec3(0, -0.4472, -0.8944); // 0.57735 == 1.0/Math.sqrt(3)
+
 
             var mainProgram, wallProgram;
             var worldMatrix, viewMatrix, projectMatrix;
@@ -37,6 +38,9 @@
             var eyePosLoc, matShLoc, matSpecLoc, matAmbiLoc, matEmitLoc, lightDirLoc;
             var shiniess = 100;
             var lightDir = vec3(2, 2, 2);
+
+            // 벽 생성 시 좌표 값으로 사용할 변수들
+            let row, col;
 
             let srcDiffColor = [1, 1, 1];
 
@@ -187,10 +191,12 @@
                     var key = String.fromCharCode(event.keyCode);
                     switch (key){
                         case 'W' :
-                            var newPosX = eye[0] + 0.3 * cameraVec[0];
-                            var newPosZ = eye[2] + 0.3 * cameraVec[2];
-                            eye[0] = newPosX;
-                            eye[2] = newPosZ;
+                            var newPosX = eye[0] + 0.2 * cameraVec[0];
+                            var newPosZ = eye[2] + 0.2 * cameraVec[2];
+                            if (newPosX > 0 && newPosX < 40 && newPosZ > 0 && newPosZ < 40 ) {
+                                eye[0] = newPosX;
+                                eye[2] = newPosZ;
+                            }
                             break;
                         case 'A' :
                             var newVecX =  cosTheta*cameraVec[0] + sinTheta*cameraVec[2];
@@ -199,10 +205,12 @@
                             cameraVec[2] = newVecZ;
                             break;
                         case 'S' :
-                            var newPosX = eye[0] - 0.3 * cameraVec[0];
-                            var newPosZ = eye[2] - 0.3 * cameraVec[2];
-                            eye[0] = newPosX;
-                            eye[2] = newPosZ;
+                            var newPosX = eye[0] - 0.2 * cameraVec[0];
+                            var newPosZ = eye[2] - 0.2 * cameraVec[2];
+                            if (newPosX > 0 && newPosX < 40 && newPosZ > 0 && newPosZ < 40 ) {
+                                eye[0] = newPosX;
+                                eye[2] = newPosZ;
+                            }
                             break;
                         case 'D' :
                             var newVecX = cosTheta*cameraVec[0] - sinTheta*cameraVec[2];
@@ -239,8 +247,8 @@
                 gl.uniformMatrix4fv(viewMatLoc2, false, flatten(viewMatrix));
                 
                 // 바닥 렌더링
-                for (let row = 0; row < 25; row++) {
-                    for (let col = 0; col < 25; col++) {
+                for (row = 0; row < 21; row++) {
+                    for (col = 0; col < 20; col++) {
                         // translate를 이용해 오브젝트가 어디서부터 그려질 것인지 결정
                         // 이 경우 (col, -1, row) 좌표부터 시작해 반복문을 돌면서 그곳에 오브젝트를 그려낸다
                         worldMatrix = translate(col * 2, -1, row * 2);
@@ -258,42 +266,30 @@
 
                 gl.useProgram(wallProgram);
                 gl.uniformMatrix4fv(viewMatLoc, false, flatten(viewMatrix));
-                // 벽 렌더링
-                // 오른쪽 전체 면 렌더링
-                for (let row = 0; row < 26; row++) {
-                    for(let height = -1; height <= 1; height += 2){
-                        worldMatrix = translate(-2, height, -2 + row * 2);
-                        gl.uniformMatrix4fv(worldMatLoc, false, flatten(worldMatrix));
-                        gl.drawArrays(gl.TRIANGLES, mapVertexCount, wallVertexCount);
-                    }
-                }
-                
-                // 아래 전체 면 렌더링
-                for (let col = 0; col < 26; col++){
-                    for(let height = -1; height <= 1; height += 2){
-                        worldMatrix = translate(-2 + col * 2, height, -2);
-                        gl.uniformMatrix4fv(worldMatLoc, false, flatten(worldMatrix));
-                        gl.drawArrays(gl.TRIANGLES, mapVertexCount, wallVertexCount);
-                    }
-                }
 
-                // 왼쪽 전체 면 렌더링
-                for (let row = 0; row < 26; row++) {
-                    for(let height = -1; height <= 1; height += 2){
-                        worldMatrix = translate(50, height, -2 + row * 2);
-                        gl.uniformMatrix4fv(worldMatLoc, false, flatten(worldMatrix));
-                        gl.drawArrays(gl.TRIANGLES, mapVertexCount, wallVertexCount);
-                    }
-                }
+                // 미로 생성
+                generateMaze();
 
-                // 위 전체 면 렌더링
-                for (let col = 0; col < 26; col++){
-                    for(let height = -1; height <= 1; height += 2){
-                        worldMatrix = translate(-2 + col * 2, height, 50);
-                        gl.uniformMatrix4fv(worldMatLoc, false, flatten(worldMatrix));
-                        gl.drawArrays(gl.TRIANGLES, mapVertexCount, wallVertexCount);
-                    }
-                }
+                gl.useProgram(mainProgram);
+
+                // 여기 고쳐야함 - 천장 렌더링이 안됨
+
+                // // 맵 천장 덮기
+                // for(col = 0; col <= 38; col += 2){
+                //     for(row = 0; row <= 38; row += 2){
+                //         worldMatrix = translate(col, 3, row);
+                //         gl.uniformMatrix4fv(worldMatLoc2, false, flatten(worldMatrix));
+                //         gl.uniform1i(texImageLoc2, 0);
+                //         gl.uniform1f(matShLoc, 1);
+                //         gl.uniform3f(matSpecLoc, 0, 0, 0);
+                //         gl.uniform3f(matAmbiLoc, 0.2, 0.2, 0.2);
+                //         gl.uniform3f(matEmitLoc, 0, 0, 0);
+                //         gl.drawArrays(gl.TRIANGLES, mapVertexCount + wallVertexCount, CeilingVertexCount);
+                //     }
+                // }
+
+                // 탈출 트리거
+
                 
                 window.requestAnimationFrame(render);
 
@@ -301,11 +297,185 @@
                 // TEXTURE0 -> 0 입력 (한림대 로고), TEXTURE1 -> 1 입력
             }
 
-            function generateModel() { 
+            // 미로 구성
+            function generateMaze(){
+                // 벽 렌더링
+                // 오른쪽 전체 면 렌더링
+                for (row = 0; row <= 40; row += 2) {
+                    col = -2
+                    generateWallCube(col, row);
+                }
+                
+                // 뒤 전체 면 렌더링
+                for (col = 0; col <= 40; col += 2){
+                    row = -2;
+                    generateWallCube(col, row);
+                }
 
+                // 왼쪽 전체 면 렌더링
+                for (row = 0; row <= 40; row += 2) {
+                    col = 40;
+                    generateWallCube(col, row);
+                }
+
+                // 앞 전체 면 렌더링
+                for (col = 0; col <= 34; col += 2){
+                    row = 40;
+                    generateWallCube(col, row);
+                }
+                
+
+                // 미로 내부 벽 렌더링
+
+                // x = 4, z = 0 ~ 8 까지 5칸짜리 직선 모양 벽
+                for(row = 0; row <= 8; row += 2){
+                    col = 4;
+                    generateWallCube(col, row);
+                }
+
+                // x = 6 ~ 12, z = 4 ~ 8 까지 3x4 크기의 직사각형 모양 벽
+                for(col = 6; col <= 12; col += 2){
+                    for(row = 4; row <= 8; row += 2){
+                        generateWallCube(col, row);
+                    }
+                }
+
+                // x = 4 ~ 12, z = 14 ~ 20 까지 4x4 크기의 정사각형 모양 벽
+                for(col = 4; col <= 12; col += 2){
+                    for(row = 14; row <= 20; row += 2){
+                        generateWallCube(col, row);
+                    }
+                }
+
+                // x = 0 ~ 2, z = 20 까지 벽 2칸 짜리 짧은 직선 모양 벽
+                for(col = 0; col <= 2; col += 2){
+                    row = 20;
+                    generateWallCube(col, row);
+                }
+
+                // x = 4 ~ 12, z = 26 ~ 28 까지 2x5 크기의 직사각형 모양 벽
+                for(col = 4; col <= 12; col += 2){
+                    for(row = 26; row <= 28; row += 2){
+                        generateWallCube(col, row);
+                    }
+                }
+
+                // x = 4 ~ 6, z = 34 ~ 38 까지 3x2 크기의 직사각형 모양 벽
+                for(col = 4; col <= 6; col += 2){
+                    for(row = 34; row <= 38; row += 2){
+                        generateWallCube(col, row);
+                    }
+                }
+
+                // x = 18, z = 14 ~ 38 까지 길이가 긴 1x13 크기의 직사각형 모양 벽
+                for(row = 14; row <= 38; row += 2){ 
+                    col = 18;
+                    generateWallCube(col, row);
+                }
+
+                // x = 12, z = 30 ~ 34 까지 3칸 짜리 3x1 크기의 짧은 직사각형 모양 벽
+                for(row = 30; row <= 34; row += 2){
+                    col = 12;
+                    generateWallCube(col, row);
+                }
+
+                // x = 14 ~ 16, z = 34 까지 2칸 짜리 1x2 크기의 짧은 직사각형 모양 벽
+                for(col = 14; col <= 16; col += 2){
+                    row = 34;
+                    generateWallCube(col, row);
+                }
+
+                // x = 18 ~ 22, z = 4 ~ 8 까지 3x3 크기의 정사각형 모양 벽
+                for(col = 18; col <= 22; col += 2){
+                    for(row = 4; row <= 8; row += 2){
+                        generateWallCube(col, row);
+                    }
+                }
+
+                // x = 24, z = 4 ~ 12 까지 5x1 크기의 직사각형 모양 벽
+                for(row = 4; row <= 12; row += 2){
+                    col = 24;
+                    generateWallCube(col, row);
+                }
+
+                // x = 20 ~ 34, z = 14 까지 1x8 크기의 직사각형 모양 벽
+                for(col = 20; col <= 34; col += 2){
+                    row = 14;
+                    generateWallCube(col, row);
+                }
+
+                // x = 30 ~ 34, z = 4 ~ 8 까지 3x4 크기의 직사각형 모양 벽
+                for(col = 30; col <= 34; col += 2){
+                    for(row = 4; row <= 8; row += 2){
+                        generateWallCube(col, row);
+                    }
+                }
+
+                // x = 30, z = 10 ~ 12 까지 2칸 짜리 2x1 크기의 짧은 직사각형 모양 벽
+                for(row = 10; row <= 12; row += 2){
+                    col = 30;
+                    generateWallCube(col, row);
+                }
+
+                // x = 32 ~ 38, z = 20 ~ 22 까지 2x5 크기의 직사각형 모양 벽
+                for(col = 32; col <= 38; col += 2){
+                    for(row = 20; row <= 22; row += 2){
+                        generateWallCube(col, row);
+                    }
+                }
+
+                // x = 30, z = 20 ~ 28 까지 1x5 크기의 직사각형 모양 벽
+                for(row = 20; row <= 28; row += 2){
+                    col = 30;
+                    generateWallCube(col, row);
+                }
+
+                // x = 32 ~ 34, z = 28 까지 1x2 크기의 2칸짜리 짧은 직사각형 모양 벽
+                for(col = 32; col <= 34; col += 2){
+                    row = 28;
+                    generateWallCube(col, row);
+                }
+
+                // x = 20 ~ 22, z = 20 ~ 22 까지 2x2 크기의 정사각형 모양 벽
+                for(col = 20; col <= 22; col += 2){
+                    for(row = 20; row <= 22; row += 2){
+                        generateWallCube(col, row);
+                    }
+                }
+
+                // x = 24, z = 20 ~ 28 까지의 5x1 크기의 직사각형 모양 벽
+                for(row = 20; row <= 28; row += 2){
+                    col = 24;
+                    generateWallCube(col, row);
+                }
+
+                // x = 24 ~ 34, z = 34 까지의 1x6 크기의 직사각형 모양 벽
+                for(col = 24; col <= 34; col += 2){
+                    row = 34;
+                    generateWallCube(col, row);
+                }
+
+                // x = 34, z = 36 ~ 38 까지의 2x1 크기의 2칸 짜리 짧은 직사각형 모양 벽
+                for(row = 36; row <= 38; row += 2){
+                    col = 34;
+                    generateWallCube(col, row);
+                }
+            }
+
+            function generateWallCube(col, row){
+                worldMatrix = translate(col, -1, row);
+                gl.uniformMatrix4fv(worldMatLoc, false, flatten(worldMatrix));
+                gl.drawArrays(gl.TRIANGLES, mapVertexCount, wallVertexCount);
+                
+                worldMatrix = translate(col, 1, row);
+                gl.uniformMatrix4fv(worldMatLoc, false, flatten(worldMatrix));
+                gl.drawArrays(gl.TRIANGLES, mapVertexCount, wallVertexCount);
+            }
+
+            function generateModel() { 
                 generateGround();
                 generateWall();
-
+                generateCeiling();
             }
 
             function generateGround(){  // 맵 바닥
@@ -418,6 +588,36 @@
 
                 const mapCeiling_downNormal = vec3(0, -1, 0); // 천장이기 때문에 아래로 향하는 법선 벡터만 있으면 됨
                 const mapCeiling_uv = [vec2(0, 0), vec2(1, 0), vec2(1, 1), vec2(0, 1)];
+
+                vertices.push(mapCeiling_pos[0]); 
+                vertices.push(mapCeiling_downNormal); 
+                vertices.push(mapCeiling_uv[0])
+                vertices.push(vec3(0, 0, 0)); CeilingVertexCount++;
+
+                vertices.push(mapCeiling_pos[1]); 
+                vertices.push(mapCeiling_downNormal); 
+                vertices.push(mapCeiling_uv[1]); 
+                vertices.push(vec3(0, 0, 0)); CeilingVertexCount++;
+
+                vertices.push(mapCeiling_pos[2]); 
+                vertices.push(mapCeiling_downNormal); 
+                vertices.push(mapCeiling_uv[2]); 
+                vertices.push(vec3(0, 0, 0)); CeilingVertexCount++;
+                // 삼각형 2: (0, 2, 3)
+                vertices.push(mapCeiling_pos[0]); 
+                vertices.push(mapCeiling_downNormal); 
+                vertices.push(mapCeiling_uv[0]); 
+                vertices.push(vec3(0, 0, 0)); CeilingVertexCount++;
+
+                vertices.push(mapCeiling_pos[2]); 
+                vertices.push(mapCeiling_downNormal); 
+                vertices.push(mapCeiling_uv[2]); 
+                vertices.push(vec3(0, 0, 0)); CeilingVertexCount++;
+
+                vertices.push(mapCeiling_pos[3]); 
+                vertices.push(mapCeiling_downNormal); 
+                vertices.push(mapCeiling_uv[3]); 
+                vertices.push(vec3(0, 0, 0)); CeilingVertexCount++;
             }
         </script>
     </body>

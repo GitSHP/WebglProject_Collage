@@ -24,20 +24,21 @@
             // var vertexCount = 0;
             // 면마다 텍스처 좌표가 다르기 때문에 인덱스를 통해서 그릴 수 없음 -> 따라서 인덱스 사용 불가
             var wallVertexCount = 0, CeilingVertexCount = 0, mapVertexCount = 0, theta = 45;
-            var eye = vec3(1, 1, 2), at = vec3(0, 0, 0), cameraVec = vec3(0, -0.4472, -0.8944); // 0.57735 == 1.0/Math.sqrt(3)
+            var eye = vec3(2, 1, 2), at = vec3(0, 0, 0), cameraVec = vec3(0, -0.4472, -0.8944); // 0.57735 == 1.0/Math.sqrt(3)
 
 
             var mainProgram, wallProgram;
             var worldMatrix, viewMatrix, projectMatrix;
 
             // wallProgram 쉐이더에 사용할 변수들
-            var worldMatLoc, viewMatLoc, projMatLoc, texImageLoc;
+            var worldMatLoc2, viewMatLoc2, projMatLoc2, texImageLoc2, eyePosLoc2;
 
             // mainProgram 쉐이더에 사용할  변수들
-            var worldMatLoc2, viewMatLoc2, projMatLoc2, texImageLoc2;
-            var eyePosLoc, matShLoc, matSpecLoc, matAmbiLoc, matEmitLoc, lightDirLoc;
+            var worldMatLoc, viewMatLoc, projMatLoc, texImageLoc;
+            var eyePosLoc, matShLoc, matSpecLoc, matAmbiLoc, matEmitLoc;
             var shiniess = 100;
             var lightDir = vec3(2, 2, 2);
+            var fogStart = 2, fogEnd = 10, fogColor = 0.1;
 
             // 벽 생성 시 좌표 값으로 사용할 변수들
             let row, col;
@@ -65,9 +66,11 @@
 
                 // Enable hidden surface removal
                 gl.enable(gl.DEPTH_TEST);
+                gl.enable(gl.BLEND);
+                gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
                 // Load shaders and initialize attribute buffers
-                mainProgram = initShaders(gl, "shaders/light_tex_vert.glsl", "shaders/light_tex_frag.glsl");
+                mainProgram = initShaders(gl, "shaders/fog_light_tex_vert.glsl", "shaders/fog_light_tex_frag.glsl");
                 gl.useProgram(mainProgram);
                 
                 // Load the data into the GPU
@@ -88,22 +91,22 @@
                 gl.vertexAttribPointer(3, 3, gl.FLOAT, false, 44, 32);
 
                 worldMatrix = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
-                worldMatLoc2 = gl.getUniformLocation(mainProgram, "worldMat");
-                gl.uniformMatrix4fv(worldMatLoc2, false, worldMatrix);
+                worldMatLoc = gl.getUniformLocation(mainProgram, "worldMat");
+                gl.uniformMatrix4fv(worldMatLoc, false, worldMatrix);
 
                 viewMatrix = lookAt(vec3(2, 2, 2), vec3(0, 0, 0), vec3(0, 1, 0));
-                viewMatLoc2 = gl.getUniformLocation(mainProgram, "viewMat");
-                gl.uniformMatrix4fv(viewMatLoc2, false, flatten(viewMatrix));
+                viewMatLoc = gl.getUniformLocation(mainProgram, "viewMat");
+                gl.uniformMatrix4fv(viewMatLoc, false, flatten(viewMatrix));
                 
                 // 3D perspective viewing
                 var aspectRatio = canvas.width / canvas.height;
                 projectMatrix = perspective(90, aspectRatio, 0.001, 1000);
-                projMatLoc2 = gl.getUniformLocation(mainProgram, "projMat");
-                gl.uniformMatrix4fv(projMatLoc2, false, flatten(projectMatrix));
+                projMatLoc = gl.getUniformLocation(mainProgram, "projMat");
+                gl.uniformMatrix4fv(projMatLoc, false, flatten(projectMatrix));
 
                 // activetexture를 통해서 함수의 매개변수로 입력되는 텍스처는 번호를 통해서 구분한다 gl.TEXTURE0 , 1, 2 같이 뒤에 붙은 번호로 구분함
 
-                texImageLoc2 = gl.getUniformLocation(mainProgram, "texImage");
+                texImageLoc = gl.getUniformLocation(mainProgram, "texImage");
                 loadTexture("Images/gravel_concrete_03_diff_4k.bmp", gl.TEXTURE0);
 
 		        // var imageTex = new Image(); // 이미지를 읽어오는 코드
@@ -139,11 +142,6 @@
                 gl.uniform3fv(eyePosLoc, flatten(eye), 0);
 
                 matShLoc = gl.getUniformLocation(mainProgram, "matSh");
-                gl.uniform1f(matShLoc, shiniess);
-
-                lightDirLoc = gl.getUniformLocation(mainProgram, "lightDir");
-                gl.uniform3fv(lightDirLoc, flatten(lightDir), 0);
-
                 matSpecLoc = gl.getUniformLocation(mainProgram, "matSpec");
                 matAmbiLoc = gl.getUniformLocation(mainProgram, "matAmbi");
                 matEmitLoc = gl.getUniformLocation(mainProgram, "matEmit");
@@ -152,26 +150,33 @@
                 gl.uniform3f(gl.getUniformLocation(mainProgram, "srcSpec"), 1, 1, 1);
                 gl.uniform3f(gl.getUniformLocation(mainProgram, "srcAmbi"), 1, 1, 1);
                 gl.uniform3f(gl.getUniformLocation(mainProgram, "lightDir"), 1, 1, 1);
+
+                gl.uniform1f(gl.getUniformLocation(mainProgram, "fogStart"), fogStart);
+                gl.uniform1f(gl.getUniformLocation(mainProgram, "fogEnd"), fogEnd);
+                gl.uniform1f(gl.getUniformLocation(mainProgram, "fogColor"), fogColor);
                 
                 // 벽에 사용할 쉐이더 wallProgram
                 wallProgram = initShaders(gl, "shaders/normal_vert.glsl", "shaders/normal_frag.glsl");
                 gl.useProgram(wallProgram);
 
-                worldMatLoc = gl.getUniformLocation(wallProgram, "worldMat");
-                gl.uniformMatrix4fv(worldMatLoc, false, worldMatrix);
+                worldMatLoc2 = gl.getUniformLocation(wallProgram, "worldMat");
+                gl.uniformMatrix4fv(worldMatLoc2, false, worldMatrix);
 
-                viewMatLoc = gl.getUniformLocation(wallProgram, "viewMat");
-                gl.uniformMatrix4fv(viewMatLoc, false, flatten(viewMatrix));
+                viewMatLoc2 = gl.getUniformLocation(wallProgram, "viewMat");
+                gl.uniformMatrix4fv(viewMatLoc2, false, flatten(viewMatrix));
 
-                projMatLoc = gl.getUniformLocation(wallProgram, "projMat");
-                gl.uniformMatrix4fv(projMatLoc, false, flatten(projectMatrix));
+                projMatLoc2 = gl.getUniformLocation(wallProgram, "projMat");
+                gl.uniformMatrix4fv(projMatLoc2, false, flatten(projectMatrix));
+
+                eyePosLoc2 = gl.getUniformLocation(wallProgram, "eyePos");
+                gl.uniform3fv(eyePosLoc2, flatten(eye), 0);
 
                 loadTexture("Images/brick_color.bmp", gl.TEXTURE1);
                 gl.uniform1i(gl.getUniformLocation(wallProgram, "texImage"), 1);
                 loadTexture("Images/brick_normal.bmp", gl.TEXTURE2);
                 gl.uniform1i(gl.getUniformLocation(wallProgram, "normalMap"), 2);
 
-                gl.uniform3f(gl.getUniformLocation(wallProgram, "eyePos"), 1, 1, 1);
+                gl.uniform3f(gl.getUniformLocation(wallProgram, "eyePos"), eye[0], eye[1], eye[2]);
 
                 gl.uniform1f(gl.getUniformLocation(wallProgram, "matSh"), 100);
                 gl.uniform3f(gl.getUniformLocation(wallProgram, "matSpec"), 1, 1, 1);
@@ -183,6 +188,9 @@
                 gl.uniform3f(gl.getUniformLocation(wallProgram, "srcAmbi"), 1, 1, 1);
                 gl.uniform3f(gl.getUniformLocation(wallProgram, "lightDir"), 1, 1, 1);
 
+                gl.uniform1f(gl.getUniformLocation(wallProgram, "fogStart"), fogStart);
+                gl.uniform1f(gl.getUniformLocation(wallProgram, "fogEnd"), fogEnd);
+                gl.uniform1f(gl.getUniformLocation(wallProgram, "fogColor"), fogColor);
 
                 var sinTheta = Math.sin(0.1);
                 var cosTheta = Math.cos(0.1);
@@ -230,9 +238,9 @@
                     var aspectRatio = canvas.width / canvas.height;
                     projectMatrix = perspective(90, aspectRatio, 0.001, 1000);
                     gl.useProgram(wallProgram);
-                    gl.uniformMatrix4fv(projMatLoc, false, flatten(projectMatrix));
-                    gl.useProgram(mainProgram);
                     gl.uniformMatrix4fv(projMatLoc2, false, flatten(projectMatrix));
+                    gl.useProgram(mainProgram);
+                    gl.uniformMatrix4fv(projMatLoc, false, flatten(projectMatrix));
                 };
             }
 
@@ -242,18 +250,29 @@
                 at[0] = eye[0] + cameraVec[0];
                 at[1] = eye[1] + cameraVec[1];
                 at[2] = eye[2] + cameraVec[2];
+                lightDir[0] = eye[0];
+                lightDir[1] = eye[1];
+                lightDir[2] = eye[2];
                 viewMatrix = lookAt(eye, at, vec3(0, 1, 0));    
-                gl.useProgram(mainProgram);
+                gl.useProgram(wallProgram);
+                gl.uniform3fv(eyePosLoc2, flatten(eye), 0);
                 gl.uniformMatrix4fv(viewMatLoc2, false, flatten(viewMatrix));
                 
+                // 미로 생성
+                generateMaze();
+
+                gl.useProgram(mainProgram);
+                gl.uniform3fv(eyePosLoc, flatten(eye), 0);
+                gl.uniformMatrix4fv(viewMatLoc, false, flatten(viewMatrix));
+
                 // 바닥 렌더링
                 for (row = 0; row < 21; row++) {
                     for (col = 0; col < 20; col++) {
                         // translate를 이용해 오브젝트가 어디서부터 그려질 것인지 결정
                         // 이 경우 (col, -1, row) 좌표부터 시작해 반복문을 돌면서 그곳에 오브젝트를 그려낸다
                         worldMatrix = translate(col * 2, -1, row * 2);
-                        gl.uniformMatrix4fv(worldMatLoc2, false, flatten(worldMatrix));
-                        gl.uniform1i(texImageLoc2, 0);
+                        gl.uniformMatrix4fv(worldMatLoc, false, flatten(worldMatrix));
+                        gl.uniform1i(texImageLoc, 0);
                         gl.uniform1f(matShLoc, 1);
                         gl.uniform3f(matSpecLoc, 0, 0, 0);
                         gl.uniform3f(matAmbiLoc, 0.2, 0.2, 0.2);
@@ -262,31 +281,26 @@
                     }
                 }
 
+                // 맵 천장 덮기
+                for(col = 0; col <= 38; col += 2){
+                    for(row = 0; row <= 38; row += 2){
+                        worldMatrix = translate(col, 3, row);
+                        gl.uniformMatrix4fv(worldMatLoc, false, flatten(worldMatrix));
+                        gl.uniform1i(texImageLoc, 0);
+                        gl.uniform1f(matShLoc, 1);
+                        gl.uniform3f(matSpecLoc, 0, 0, 0);
+                        gl.uniform3f(matAmbiLoc, 0.2, 0.2, 0.2);
+                        gl.uniform3f(matEmitLoc, 0.1, 0.1, 0.1);
+                        gl.drawArrays(gl.TRIANGLES, mapVertexCount + wallVertexCount, CeilingVertexCount);
+                    }
+                }
+
+                // 안개가 플레이어를 따라다니지 않고 특정 지점을 기준으로 렌더링되는 문제 발생
+                // 이는 맵 천장, 바닥, 벽을 렌더링하는데 사용했던 worldMatrix = translate(); 로 인해 worldMatrix 값이 바뀌었기 때문
+                // worldMatrix 값을 전부 사용한 후에는 다시 원래대로 되돌려놓는다
+                worldMatrix = mat4();
+
                 // 이후에 오브젝트를 추가하는 경우 VertexCount의 값을 모두 더한 이후부터 오브젝트를 그리기 시작하면 된다
-
-                gl.useProgram(wallProgram);
-                gl.uniformMatrix4fv(viewMatLoc, false, flatten(viewMatrix));
-
-                // 미로 생성
-                generateMaze();
-
-                gl.useProgram(mainProgram);
-
-                // 여기 고쳐야함 - 천장 렌더링이 안됨
-
-                // // 맵 천장 덮기
-                // for(col = 0; col <= 38; col += 2){
-                //     for(row = 0; row <= 38; row += 2){
-                //         worldMatrix = translate(col, 3, row);
-                //         gl.uniformMatrix4fv(worldMatLoc2, false, flatten(worldMatrix));
-                //         gl.uniform1i(texImageLoc2, 0);
-                //         gl.uniform1f(matShLoc, 1);
-                //         gl.uniform3f(matSpecLoc, 0, 0, 0);
-                //         gl.uniform3f(matAmbiLoc, 0.2, 0.2, 0.2);
-                //         gl.uniform3f(matEmitLoc, 0, 0, 0);
-                //         gl.drawArrays(gl.TRIANGLES, mapVertexCount + wallVertexCount, CeilingVertexCount);
-                //     }
-                // }
 
                 // 탈출 트리거
 
@@ -464,11 +478,11 @@
 
             function generateWallCube(col, row){
                 worldMatrix = translate(col, -1, row);
-                gl.uniformMatrix4fv(worldMatLoc, false, flatten(worldMatrix));
+                gl.uniformMatrix4fv(worldMatLoc2, false, flatten(worldMatrix));
                 gl.drawArrays(gl.TRIANGLES, mapVertexCount, wallVertexCount);
                 
                 worldMatrix = translate(col, 1, row);
-                gl.uniformMatrix4fv(worldMatLoc, false, flatten(worldMatrix));
+                gl.uniformMatrix4fv(worldMatLoc2, false, flatten(worldMatrix));
                 gl.drawArrays(gl.TRIANGLES, mapVertexCount, wallVertexCount);
             }
 
@@ -586,7 +600,7 @@
                     vec3(0, 0, 2)    // 오른쪽 위
                 ];
 
-                const mapCeiling_downNormal = vec3(0, -1, 0); // 천장이기 때문에 아래로 향하는 법선 벡터만 있으면 됨
+                const mapCeiling_downNormal = vec3(0, 1, 0); // 천장이기 때문에 아래로 향하는 법선 벡터만 있으면 됨
                 const mapCeiling_uv = [vec2(0, 0), vec2(1, 0), vec2(1, 1), vec2(0, 1)];
 
                 vertices.push(mapCeiling_pos[0]); 

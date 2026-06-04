@@ -14,6 +14,6 @@ void main()
     fNormal = normalize(transpose(inverse(mat3(worldMat))) * normalize(vNormal));   
     worldPos = (worldMat * vec4(vPosition, 1)).xyz;
     // fView = normalize(eyePos - worldPos);
-    gl_Position = projMat * viewMat * vec4(worldPos, 1);
+    gl_Position = projMat * viewMat * vec4(worldPos, 1.0);
     fTexCoord = vTexCoord;
 }

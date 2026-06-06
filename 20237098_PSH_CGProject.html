@@ -9,13 +9,29 @@
                 padding: 0;
                 overflow: hidden;
             }
+            #escapeScreen {
+                display: none;              /* 평소엔 숨김 */
+                position: fixed;            /* 화면에 고정 */
+                top: 0; left: 0;
+                width: 100%; height: 100%;
+                z-index: 10;                /* canvas 위에 표시 */
+            }
+            #escapeScreen img {
+                width: 100%;
+                height: 100%;
+                object-fit : cover;          /* 화면 꽉 채우기 */
+            }
         </style>
     </head>
     <body>
         <div id="myMenu"><center>
 
         </center></div>
-        <canvas id="glCanvas"></canvas>
+        <canvas id="glCanvas">
+            <div id = "escapeScreen">
+                <img src = "Images/escapemaze.jfif">
+            </div>
+        </canvas>
         <script type="text/javascript" src="shaders/initShaders2.js"></script>
         <script type="text/javascript" src="MV.js"></script>
         <script type="module">
@@ -38,12 +54,25 @@
             var eyePosLoc, matShLoc, matSpecLoc, matAmbiLoc, matEmitLoc;
             var shiniess = 100;
             var lightDir = vec3(2, 2, 2);
-            var fogStart = 2, fogEnd = 10, fogColor = 0.1;
+            var fogStart = 2, fogEnd = 5.5, fogColor = 0.1;
 
             // 벽 생성 시 좌표 값으로 사용할 변수들
             let row, col;
 
             let srcDiffColor = [1, 1, 1];
+
+            // AABB 충돌 감지를 위한 변수 및 배열
+            // 충돌 판정용 벽 목록
+            // 벽의 정점은 (0, 0, 0) ~ (2, 2, 2) 의 크기로 xz 평면에서 x = 0 ~ 2, z = 0 ~ 2 만큼의 공간을 차지한다
+            // 이 공간을 wallList 배열에 넣는다. 이 공간과 카메라가 차지하는 반지름이 0.3인 원통의 공간이 서로 겹치면 충돌을 감지함
+            const wallList = [];
+
+            // 카메라의 반지름을 정의하는 변수
+            // 카메라를 반지름이 0.3인 원통형으로 취급하여 충돌을 계산한다
+            const EYE_RADIUS = 0.3;
+
+            // 탈출 판정 시 사용할 플래그 변수
+            let isEscaped = false;
 
             generateModel();
             init();
@@ -146,8 +175,8 @@
                 matAmbiLoc = gl.getUniformLocation(mainProgram, "matAmbi");
                 matEmitLoc = gl.getUniformLocation(mainProgram, "matEmit");
 
-                gl.uniform3f(gl.getUniformLocation(mainProgram, "srcDiff"), 1, 1, 1);
-                gl.uniform3f(gl.getUniformLocation(mainProgram, "srcSpec"), 1, 1, 1);
+                gl.uniform3f(gl.getUniformLocation(mainProgram, "srcDiff"), 0.5, 0.5, 0.5);
+                gl.uniform3f(gl.getUniformLocation(mainProgram, "srcSpec"), 0.5, 0.5, 0.5);
                 gl.uniform3f(gl.getUniformLocation(mainProgram, "srcAmbi"), 1, 1, 1);
                 gl.uniform3f(gl.getUniformLocation(mainProgram, "lightDir"), 1, 1, 1);
 
@@ -183,8 +212,8 @@
                 gl.uniform3f(gl.getUniformLocation(wallProgram, "matAmbi"), 0.2, 0.2, 0.2);
                 gl.uniform3f(gl.getUniformLocation(wallProgram, "matEmit"), 0, 0, 0);
 
-                gl.uniform3f(gl.getUniformLocation(wallProgram, "srcDiff"), 1, 1, 1);
-                gl.uniform3f(gl.getUniformLocation(wallProgram, "srcSpec"), 1, 1, 1);
+                gl.uniform3f(gl.getUniformLocation(wallProgram, "srcDiff"), 0.5, 0.5, 0.5);
+                gl.uniform3f(gl.getUniformLocation(wallProgram, "srcSpec"), 0.5, 0.5, 0.5);
                 gl.uniform3f(gl.getUniformLocation(wallProgram, "srcAmbi"), 1, 1, 1);
                 gl.uniform3f(gl.getUniformLocation(wallProgram, "lightDir"), 1, 1, 1);
 
@@ -195,13 +224,36 @@
                 var sinTheta = Math.sin(0.1);
                 var cosTheta = Math.cos(0.1);
 
+                // AABB 충돌 감지 함수
+                // wallList 배열에 넣은 wallCol(x 값)과 wallRow(z 값) -> (벽이 차지하는 공간의 좌표 값)을 반복문을 돌면서
+                // isColliding 함수의 매개변수인 x, z 값 (카메라가 이동했을 때 카메라의 현재 x, z 좌표 값) 을 전달하고
+                // 그 값에 위에서 변수로 정의한 EYE_RADIUS의 값만큼 값을 추가한다.
+                // 이렇게 하면 카메라가 위치한 좌표값을 기준으로 x + 0.3, x - 0.3, z + 0.3, z - 0.3의 크기만큼의 확장된 정사각형이 만들어진다
+                // 이 확장된 정사각형의 x 값과 z 값은
+                // x + 0.3 > wallCol 값보다 크거나, x - 0.3 < wallCol + 2 값보다 작으면 
+                // --> 카메라의 확장된 정사각형이 벽이 차지한 공간 x 좌표 안에 들어갔단 뜻이 되고
+                // z + 0.3 > wallRow 값보다 크거나, z - 0.3 < wallRow + 2 값보다 작으면
+                // --> 카메라의 확장된 정사각형이 벽이 차지한 공간 z 좌표 안에 들어갔단 뜻이 된다.
+                // 따라서 카메라의 확장된 정사각형이 벽이 차지한 x, z 좌표 안에 들어가지 못하도록 한다
+                // 이런 방식으로 충돌을 감지해주는 충돌 감지 기법이 AABB 충돌 감지 기법이다
+                function isColliding(x, z) {
+                    for (const [wallcol, wallrow] of wallList) {
+                        if (x + EYE_RADIUS > wallcol && x - EYE_RADIUS < wallcol + 2 && 
+                            z + EYE_RADIUS > wallrow && z - EYE_RADIUS < wallrow + 2) 
+                        {
+                            return true;
+                        }
+                    }
+                    return false;
+                }
+
                 window.onkeydown = function(event){
                     var key = String.fromCharCode(event.keyCode);
                     switch (key){
                         case 'W' :
-                            var newPosX = eye[0] + 0.2 * cameraVec[0];
-                            var newPosZ = eye[2] + 0.2 * cameraVec[2];
-                            if (newPosX > 0 && newPosX < 40 && newPosZ > 0 && newPosZ < 40 ) {
+                            var newPosX = eye[0] + 0.1 * cameraVec[0];
+                            var newPosZ = eye[2] + 0.1 * cameraVec[2];
+                            if (!isColliding(newPosX, newPosZ)) {
                                 eye[0] = newPosX;
                                 eye[2] = newPosZ;
                             }
@@ -213,9 +265,9 @@
                             cameraVec[2] = newVecZ;
                             break;
                         case 'S' :
-                            var newPosX = eye[0] - 0.2 * cameraVec[0];
-                            var newPosZ = eye[2] - 0.2 * cameraVec[2];
-                            if (newPosX > 0 && newPosX < 40 && newPosZ > 0 && newPosZ < 40 ) {
+                            var newPosX = eye[0] - 0.1 * cameraVec[0];
+                            var newPosZ = eye[2] - 0.1 * cameraVec[2];
+                            if (!isColliding(newPosX, newPosZ)) {
                                 eye[0] = newPosX;
                                 eye[2] = newPosZ;
                             }
@@ -303,8 +355,22 @@
                 // 이후에 오브젝트를 추가하는 경우 VertexCount의 값을 모두 더한 이후부터 오브젝트를 그리기 시작하면 된다
 
                 // 탈출 트리거
+                // alert으로 탈출 판정 시 다시 확인을 눌러도 다시 탈출 판정이 뜨던 문제
+                // alert은 브라우저의 모든 실행을 멈추게 만드는 블로킹 함수임 - alert이 실행되면 다른 스크립트의 실행이 중단됨
+                // 확인을 누르면 예약되어 쌓였던 window.requestAnimationFrame(render);가 실행되고 다시 alert을 발생시킴
+                // 따라서 확인을 누르더라도 탈출 판정이 일어나게 되는 것
+                // 이를 방지하기 위해서 탈출 판정을 확인하는 플래그 변수를 추가하고 alert이 아닌 다른 방법으로 탈출했음을 알려줌
+                if(isEscaped){
+                    return; 
+                } 
 
-                
+                if(eye[0] > 38 && eye[0] <= 40 && eye[2] > 36 && eye[2] <= 38){
+                    isEscaped = true;
+                    alert("탈출 성공!");
+                    return;
+                }
+
+
                 window.requestAnimationFrame(render);
 
                 // uniform1i에서 방금 지정한 그림의 번호 0,1가 어떤 그림을 가지고 있는지 알고 두 번째 매개변수에 번호를 넣어서 해당 번호에 해당하는 그림을 렌더링할 수 있다
@@ -318,24 +384,28 @@
                 for (row = 0; row <= 40; row += 2) {
                     col = -2
                     generateWallCube(col, row);
+                    wallList.push([col, row]);
                 }
                 
                 // 뒤 전체 면 렌더링
                 for (col = 0; col <= 40; col += 2){
                     row = -2;
                     generateWallCube(col, row);
+                    wallList.push([col, row]);
                 }
 
                 // 왼쪽 전체 면 렌더링
                 for (row = 0; row <= 40; row += 2) {
                     col = 40;
                     generateWallCube(col, row);
+                    wallList.push([col, row]);
                 }
 
                 // 앞 전체 면 렌더링
                 for (col = 0; col <= 34; col += 2){
                     row = 40;
                     generateWallCube(col, row);
+                    wallList.push([col, row]);
                 }
                 
 
@@ -345,12 +415,14 @@
                 for(row = 0; row <= 8; row += 2){
                     col = 4;
                     generateWallCube(col, row);
+                    wallList.push([col, row]);
                 }
 
                 // x = 6 ~ 12, z = 4 ~ 8 까지 3x4 크기의 직사각형 모양 벽
                 for(col = 6; col <= 12; col += 2){
                     for(row = 4; row <= 8; row += 2){
                         generateWallCube(col, row);
+                        wallList.push([col, row]);
                     }
                 }
 
@@ -358,6 +430,7 @@
                 for(col = 4; col <= 12; col += 2){
                     for(row = 14; row <= 20; row += 2){
                         generateWallCube(col, row);
+                        wallList.push([col, row]);
                     }
                 }
 
@@ -365,12 +438,14 @@
                 for(col = 0; col <= 2; col += 2){
                     row = 20;
                     generateWallCube(col, row);
+                    wallList.push([col, row]);
                 }
 
                 // x = 4 ~ 12, z = 26 ~ 28 까지 2x5 크기의 직사각형 모양 벽
                 for(col = 4; col <= 12; col += 2){
                     for(row = 26; row <= 28; row += 2){
                         generateWallCube(col, row);
+                        wallList.push([col, row]);
                     }
                 }
 
@@ -378,6 +453,7 @@
                 for(col = 4; col <= 6; col += 2){
                     for(row = 34; row <= 38; row += 2){
                         generateWallCube(col, row);
+                        wallList.push([col, row]);
                     }
                 }
 
@@ -385,24 +461,28 @@
                 for(row = 14; row <= 38; row += 2){ 
                     col = 18;
                     generateWallCube(col, row);
+                    wallList.push([col, row]);
                 }
 
                 // x = 12, z = 30 ~ 34 까지 3칸 짜리 3x1 크기의 짧은 직사각형 모양 벽
                 for(row = 30; row <= 34; row += 2){
                     col = 12;
                     generateWallCube(col, row);
+                    wallList.push([col, row]);
                 }
 
                 // x = 14 ~ 16, z = 34 까지 2칸 짜리 1x2 크기의 짧은 직사각형 모양 벽
                 for(col = 14; col <= 16; col += 2){
                     row = 34;
                     generateWallCube(col, row);
+                    wallList.push([col, row]);
                 }
 
                 // x = 18 ~ 22, z = 4 ~ 8 까지 3x3 크기의 정사각형 모양 벽
                 for(col = 18; col <= 22; col += 2){
                     for(row = 4; row <= 8; row += 2){
                         generateWallCube(col, row);
+                        wallList.push([col, row]);
                     }
                 }
 
@@ -410,18 +490,21 @@
                 for(row = 4; row <= 12; row += 2){
                     col = 24;
                     generateWallCube(col, row);
+                    wallList.push([col, row]);
                 }
 
                 // x = 20 ~ 34, z = 14 까지 1x8 크기의 직사각형 모양 벽
                 for(col = 20; col <= 34; col += 2){
                     row = 14;
                     generateWallCube(col, row);
+                    wallList.push([col, row]);
                 }
 
                 // x = 30 ~ 34, z = 4 ~ 8 까지 3x4 크기의 직사각형 모양 벽
                 for(col = 30; col <= 34; col += 2){
                     for(row = 4; row <= 8; row += 2){
                         generateWallCube(col, row);
+                        wallList.push([col, row]);
                     }
                 }
 
@@ -429,12 +512,14 @@
                 for(row = 10; row <= 12; row += 2){
                     col = 30;
                     generateWallCube(col, row);
+                    wallList.push([col, row]);
                 }
 
                 // x = 32 ~ 38, z = 20 ~ 22 까지 2x5 크기의 직사각형 모양 벽
                 for(col = 32; col <= 38; col += 2){
                     for(row = 20; row <= 22; row += 2){
                         generateWallCube(col, row);
+                        wallList.push([col, row]);
                     }
                 }
 
@@ -442,18 +527,21 @@
                 for(row = 20; row <= 28; row += 2){
                     col = 30;
                     generateWallCube(col, row);
+                    wallList.push([col, row]);
                 }
 
                 // x = 32 ~ 34, z = 28 까지 1x2 크기의 2칸짜리 짧은 직사각형 모양 벽
                 for(col = 32; col <= 34; col += 2){
                     row = 28;
                     generateWallCube(col, row);
+                    wallList.push([col, row]);
                 }
 
                 // x = 20 ~ 22, z = 20 ~ 22 까지 2x2 크기의 정사각형 모양 벽
                 for(col = 20; col <= 22; col += 2){
                     for(row = 20; row <= 22; row += 2){
                         generateWallCube(col, row);
+                        wallList.push([col, row]);
                     }
                 }
 
@@ -461,18 +549,21 @@
                 for(row = 20; row <= 28; row += 2){
                     col = 24;
                     generateWallCube(col, row);
+                    wallList.push([col, row]);
                 }
 
                 // x = 24 ~ 34, z = 34 까지의 1x6 크기의 직사각형 모양 벽
                 for(col = 24; col <= 34; col += 2){
                     row = 34;
                     generateWallCube(col, row);
+                    wallList.push([col, row]);
                 }
 
                 // x = 34, z = 36 ~ 38 까지의 2x1 크기의 2칸 짜리 짧은 직사각형 모양 벽
                 for(row = 36; row <= 38; row += 2){
                     col = 34;
                     generateWallCube(col, row);
+                    wallList.push([col, row]);
                 }
             }
 

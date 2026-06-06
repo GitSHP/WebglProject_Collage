@@ -31,7 +31,9 @@ void main()
     // specular term
     // vec3 refl = 2.0 * normal * dot(normal, light) - light; 
     // vec3 spec = pow(max(dot(refl, view), 0.0), matSh) * srcSpec * matSpec;
-    // Phong Model -> 이 모델은 수학적 계산했을 때 큐브의 어두운 부분에 빛의 하이라이트 부분이 보인다. 수학적으로 오류는 아니지만 현실적이지 못하기 때문에 Blinn Model을 사용함
+    // Phong Model 
+    // -> 퐁 모델은 수학적 계산했을 때 큐브의 어두운 부분에 빛의 하이라이트 부분이 보인다. 
+    // 수학적으로 오류는 아니지만 현실적이지 못하기 때문에 Blinn Model을 사용함
 
     vec3 halfv = normalize(light + view);
     vec3 spec = pow(max(dot(normal, halfv), 0.0), matSh) * srcSpec * matSpec;

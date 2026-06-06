@@ -29,7 +29,7 @@
         </center></div>
         <canvas id="glCanvas">
             <div id = "escapeScreen">
-                <img src = "Images/escapemaze.jfif">
+                <img src = "Images/escapemaze.jfif"> <!-- AI 생성 이미지 -->>
             </div>
         </canvas>
         <audio id = "bgm" src = "sounds/grimyth - A darkness exists within us all.mp3" loop></audio> 
@@ -736,6 +736,10 @@
                 vertices.push(mapCeiling_downNormal); 
                 vertices.push(mapCeiling_uv[3]); 
                 vertices.push(vec3(0, 0, 0)); CeilingVertexCount++;
+            }
+
+            function generateGhost(){
+
             }
         </script>
     </body>

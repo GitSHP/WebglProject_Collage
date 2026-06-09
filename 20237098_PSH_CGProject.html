@@ -11,29 +11,50 @@
             }
             #escapeScreen {
                 display: none;              /* 평소엔 숨김 */
-                position: fixed;            /* 화면에 고정 */
+                position: fixed;            /* 특정 위치의 화면에 사진을 고정 */
                 top: 0; left: 0;
                 width: 100%; height: 100%;
                 z-index: 10;                /* canvas 위에 표시 */
+                background-color: black;
             }
             #escapeScreen img {
                 width: 100%;
                 height: 100%;
                 object-fit : cover;          /* 화면 꽉 채우기 */
             }
+
+            #jumpScareScreen {
+                display: none;
+                position: fixed;
+                top: 0; left: 0;
+                width: 100%; height: 100%;
+                z-index: 20;
+                opacity: 1;                 /* 초기 투명도 (1=완전 선명함) */
+                transition: opacity 3s ease-out; /* 투명도가 변할 때 2초 동안 서서히 흐려지게 설정 */
+                pointer-events: none;       /* 이미지가 마우스 클릭을 방해하지 않도록 설정 */
+            }
+
+            #jumpScareScreen img {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+            }
         </style>
     </head>
     <body>
-        <div id="myMenu"><center>
+        <div id="myMenu"><center></center></div>
+        <canvas id="glCanvas"></canvas>
 
-        </center></div>
-        <canvas id="glCanvas">
-            <div id = "escapeScreen">
-                <img src = "Images/escapemaze.jfif"> <!-- AI 생성 이미지 -->>
-            </div>
-        </canvas>
+        <div id = "escapeScreen">
+            <img src = "Images/escapemaze.jpg"> <!-- AI 생성 이미지 -->>
+        </div>
+        <div id = "jumpScareScreen">
+            <img src = "Images/087face.jpg">
+        </div>
+
         <audio id = "bgm" src = "sounds/grimyth - A darkness exists within us all.mp3" loop></audio> 
-        <!-- 배경음악 출처 = https://assetstore.unity.com/packages/audio/music/dark-horror-ambient-music-grimytheus-vol-2-290709 -->>
+        <audio id = "jumpScareSound" src = "sounds/2021_HJS_JumpScare_Medium_1_BV.mp3"></audio>
+        <audio id = "laughingSound" src = "sounds/oliper18-scary-laugh-377526.mp3"></audio>
         <script type="text/javascript" src="shaders/initShaders2.js"></script>
         <script type="text/javascript" src="MV.js"></script>
         <script type="module">
@@ -41,9 +62,8 @@
             let vertices = [];
             // var vertexCount = 0;
             // 면마다 텍스처 좌표가 다르기 때문에 인덱스를 통해서 그릴 수 없음 -> 따라서 인덱스 사용 불가
-            var wallVertexCount = 0, CeilingVertexCount = 0, mapVertexCount = 0, theta = 45;
+            var wallVertexCount = 0, CeilingVertexCount = 0, mapVertexCount = 0, ghostVertexCount = 0, theta = 45;
             var eye = vec3(2, 1, 2), at = vec3(0, 0, 0), cameraVec = vec3(0, -0.4472, -0.8944); // 0.57735 == 1.0/Math.sqrt(3)
-
 
             var mainProgram, wallProgram;
             var worldMatrix, viewMatrix, projectMatrix;
@@ -56,7 +76,7 @@
             var eyePosLoc, matShLoc, matSpecLoc, matAmbiLoc, matEmitLoc;
             var shiniess = 100;
             var lightDir = vec3(2, 2, 2);
-            var fogStart = 2, fogEnd = 5.5, fogColor = 0.1;
+            var fogStart = 0.5, fogEnd = 7.0, fogColor = 0.1;
 
             // 벽 생성 시 좌표 값으로 사용할 변수들
             let row, col;
@@ -70,8 +90,20 @@
             const wallList = [];
 
             // 카메라의 반지름을 정의하는 변수
-            // 카메라를 반지름이 0.3인 원통형으로 취급하여 충돌을 계산한다
+            // 카메라를 반지름이 0.3인 사각형으로 취급하여 충돌을 계산한다
             const EYE_RADIUS = 0.3;
+
+            // 유령이 생성될 위치 값 등 유령과 관련된 정보 값을 저장하는 배열
+            // 이 배열 안에 유령의 위치 값이나 다른 관련된 정보들을 객체로 넣어서 관리한다
+            // 배열 객체로 만들어서 ghost[0].x, .z, 와 같이 배열에서 내가 원하는 유령 정보들을 꺼내서 사용할 수 있다.
+            const ghost = [
+                {x : 15.5, z : 2, appearDist : 10.0, disappearDist : 6.0, visible : false},
+                {x : 37.5, z : 8, appearDist : 10.0, disappearDist : 6.0, visible : false},
+                {x : 34, z : 31.5, appearDist : 10.0, disappearDist : 4.0, visible : false}
+            ];
+
+            // 점프스퀘어에 사용할 플래그 변수
+            let hasJumpScared = false;
 
             // 탈출 판정 시 사용할 플래그 변수
             let isEscaped = false;
@@ -142,6 +174,7 @@
 
                 texImageLoc = gl.getUniformLocation(mainProgram, "texImage");
                 loadTexture("Images/gravel_concrete_03_diff_4k.bmp", gl.TEXTURE0);
+                loadTexture("Images/087face.jpg", gl.TEXTURE3);
 
 		        // var imageTex = new Image(); // 이미지를 읽어오는 코드
                 // imageTex.src = "Images/logo.bmp"; // 같은 폴더 내에 있는 이미지의 위치
@@ -263,8 +296,8 @@
                     var key = String.fromCharCode(event.keyCode);
                     switch (key){
                         case 'W' :
-                            var newPosX = eye[0] + 0.1 * cameraVec[0];
-                            var newPosZ = eye[2] + 0.1 * cameraVec[2];
+                            var newPosX = eye[0] + 0.08 * cameraVec[0];
+                            var newPosZ = eye[2] + 0.08 * cameraVec[2];
                             if (!isColliding(newPosX, newPosZ)) {
                                 eye[0] = newPosX;
                                 eye[2] = newPosZ;
@@ -277,8 +310,8 @@
                             cameraVec[2] = newVecZ;
                             break;
                         case 'S' :
-                            var newPosX = eye[0] - 0.1 * cameraVec[0];
-                            var newPosZ = eye[2] - 0.1 * cameraVec[2];
+                            var newPosX = eye[0] - 0.08 * cameraVec[0];
+                            var newPosZ = eye[2] - 0.08 * cameraVec[2];
                             if (!isColliding(newPosX, newPosZ)) {
                                 eye[0] = newPosX;
                                 eye[2] = newPosZ;
@@ -359,6 +392,77 @@
                     }
                 }
 
+                // 이 부분에 적을 렌더링하는 코드 추가 - 플레이어가 특정 위치에 도착했을때부터 렌더링을 시작하고
+                // 가까이 가면 렌더링을 멈추도록 함
+                // 후반에 생성되는 적은 가까이 가면 점프스퀘어하는 요소도 추가
+                // 현재는 렌더링만 하도록 되어있음.
+
+                // 반복문을 돌려서 ghost 배열 안의 객체를 꺼내서 사용한다.
+                for(const ghostPara of ghost){
+
+                    // 카메라와 ghost 사이의 거리 값을 구한다
+                    const distX = eye[0] - ghostPara.x;
+                    const distZ = eye[2] - ghostPara.z;
+                    const dist = Math.sqrt(distX * distX + distZ * distZ);
+
+                    // 만약 카메라와 ghost 사이의 거리가 특정 거리만큼 가까워지면 ghost의 렌더링(visible) 여부를 true로 바꾼다
+                    // 카메라가 유령보다 살짝 멀리 있을 때는 보이다가 ->
+                    if(dist < ghostPara.appearDist){
+                        ghostPara.visible = true;
+                    }
+
+                    // 만약 카메라와 ghost 사이의 거리가 특정 거리만큼 가까워지면 ghost의 렌더링(visible) 여부를 true로 바꾼다
+                    // -> 카메라가 더 가까이 다가가면 렌더링을 멈춰 ghost가 안보이게함
+                    // 첫 번째와 두 번째 나타나는 유령만 가까이 갔을 때 사라지면서 웃는 소리가 나오게 함
+                    if(dist < ghostPara.disappearDist && ghostPara.x != 34 && ghostPara.z != 31.5){
+                        ghostPara.visible = false;
+                        document.getElementById("laughingSound").play();
+                    }
+
+                    // 마지막에 만나는 ghost에게 가까이 다가갔을 경우 점프스퀘어가 나오도록 함
+                    if(dist < ghostPara.disappearDist && ghostPara.x == 34 && ghostPara.z == 31.5){
+                        ghostPara.visible = false;
+
+                        // 만약 점프스퀘어 화면이 나타난 적이 없다면 실행
+                        if(!hasJumpScared){
+                            hasJumpScared = true;
+
+                            // 점프스퀘어 시 소리와 함께 점프스퀘어 용 화면을 띄우고
+                            document.getElementById("jumpScareSound").play();
+                            let jumpScareScreen = document.getElementById("jumpScareScreen");
+                            jumpScareScreen.style.display = "block";
+
+                            // 처음에는 사진을 선명하게 띄웠다가 
+                            jumpScareScreen.style.opacity = "1";
+
+                            // 0.3(300)초 동안은 선명하게 띄운 후 서서히 사진이 흐려지도록 함
+                            // transition: opacity 2s ease-out; 이 코드에 의해서 2초에 걸쳐 천천히 투명해짐
+                            
+                            setTimeout(function(){
+                                jumpScareScreen.style.opacity = "0";
+                            }, 300);
+
+                            // 흐려지는 시간 3초(3000)과 대기 시간 0.3초 (300)의 시간이 지난 후 화면에서 안보이도록 함
+                            setTimeout(function(){
+                                jumpScareScreen.style.display = "none";
+                            }, 3300)
+                        }
+                    }
+
+                    if(ghostPara.visible){
+                        worldMatrix = translate(ghostPara.x, 1, ghostPara.z);
+                        gl.uniformMatrix4fv(worldMatLoc, false, flatten(worldMatrix));
+                        gl.uniform1i(texImageLoc, 3);
+                        gl.uniform1f(matShLoc, 1);
+                        gl.uniform3f(matSpecLoc, 0, 0, 0);
+                        gl.uniform3f(matAmbiLoc, 0, 0, 0);
+                        gl.uniform3f(matEmitLoc, 0.09, 0.09, 0.09);
+                        gl.drawArrays(gl.TRIANGLES, mapVertexCount + wallVertexCount + CeilingVertexCount, ghostVertexCount);
+                    }
+                }
+
+                // ghost 모델을 렌더링할 때 사진이 앞뒤로만 렌더링되는 문제 발생
+
                 // 안개가 플레이어를 따라다니지 않고 특정 지점을 기준으로 렌더링되는 문제 발생
                 // 이는 맵 천장, 바닥, 벽을 렌더링하는데 사용했던 worldMatrix = translate(); 로 인해 worldMatrix 값이 바뀌었기 때문
                 // worldMatrix 값을 전부 사용한 후에는 다시 원래대로 되돌려놓는다
@@ -379,10 +483,12 @@
                 if(eye[0] > 38 && eye[0] <= 40 && eye[2] > 36 && eye[2] <= 38){
                     isEscaped = true;
                     document.getElementById("bgm").pause();
-                    alert("탈출 성공!");
+                    document.getElementById("escapeScreen").style.display = "block";
+                    setTimeout(function(){
+                        alert("탈출 성공!");
+                    }, 100);
                     return;
                 }
-
 
                 window.requestAnimationFrame(render);
 
@@ -594,6 +700,7 @@
                 generateGround();
                 generateWall();
                 generateCeiling();
+                generateGhost();
             }
 
             function generateGround(){  // 맵 바닥
@@ -657,8 +764,8 @@
                 // 각 면에 해당하는 법선 벡터를 따로 구해서 할당한다
                 texQuadTangent(0, 3, 7, 4,  1, 0, 0,  0, 1, 1);    // right == +yz plane 오른쪽 면은 -x 축 방향으로 향하는 법선 벡터
                 texQuadTangent(1, 0, 4, 5,  0, 0, 1,  1, 1, 0);    // back == -xy plane 뒷 면은 
-                texQuadTangent(1, 5, 6, 2,  1, 0, 0,  0, 1, 1);    // left == -yz plane
-                texQuadTangent(2, 6, 7, 3,  0, 0, 1,  1, 1, 0);    // front == +xy plane
+                texQuadTangent(1, 2, 6, 5,  1, 0, 0,  0, 1, 1);    // left == -yz plane
+                texQuadTangent(3, 2, 6, 7,  0, 0, 1,  1, 1, 0);    // front == +xy plane
                 texQuadTangent(1, 2, 3, 0,  0, 1, 0,  1, 0, 1);    // bottom == -zx plane
                 texQuadTangent(6, 5, 4, 7,  0, 1, 0,  1, 0, 1);    // top == +zx plane
 
@@ -704,7 +811,7 @@
                     vec3(0, 0, 2)    // 오른쪽 위
                 ];
 
-                const mapCeiling_downNormal = vec3(0, 1, 0); // 천장이기 때문에 아래로 향하는 법선 벡터만 있으면 됨
+                const mapCeiling_downNormal = vec3(0, -1, 0); // 천장이기 때문에 아래로 향하는 법선 벡터만 있으면 됨
                 const mapCeiling_uv = [vec2(0, 0), vec2(1, 0), vec2(1, 1), vec2(0, 1)];
 
                 vertices.push(mapCeiling_pos[0]); 
@@ -739,7 +846,60 @@
             }
 
             function generateGhost(){
+                 const ghost_pos = [
+                    vec3(0, 0, 0),  // 바닥 오른쪽 아래 좌표
+                    vec3(0.5, 0, 0),  //      왼쪽 아래
+                    vec3(0.5, 0, 0.5),  //      왼쪽 위
+                    vec3(0, 0, 0.5),  //      오른쪽 위
+                    vec3(0, 0.5, 0),  // 천장 오른쪽 아래 좌표
+                    vec3(0.5, 0.5, 0),  //      왼쪽 아래
+                    vec3(0.5, 0.5, 0.5),  //      왼쪽 위      
+                    vec3(0, 0.5, 0.5)   //      오른쪽 위
+                ];
 
+                const ghost_uv = [vec2(0, 0), vec2(1, 0), vec2(1, 1), vec2(0, 1)];
+
+                // 각 면에 해당하는 법선 벡터를 따로 구해서 할당한다
+                // 사진이 거꾸로 뒤집혀서 렌더링되는 문제, 삼각형을 그리는 순서를 반대로 바꿔서 해결
+                texQuad(4, 7, 3, 0,  1, 0, 0);    // right == +yz plane 오른쪽 면은 -x 축 방향으로 향하는 법선 벡터
+                texQuad(5, 4, 0, 1,  0, 0, 1);    // back == -xy plane 뒷 면은 
+                texQuad(5, 6, 2, 1,  1, 0, 0);    // left == -yz plane
+                texQuad(7, 6, 2, 3,  0, 0, 1);    // front == +xy plane
+                texQuad(0, 3, 2, 1,  0, 1, 0);    // bottom == -zx plane
+                texQuad(7, 4, 5, 6,  0, 1, 0);    // top == +zx plane
+
+                function texQuad(a, b, c, d, nx, ny, nz) {
+                    // two triangles (a, b, c) and (a, c, d)
+                    vertices.push(ghost_pos[a]);
+                    vertices.push(vec3(nx, ny, nz));    
+                    vertices.push(ghost_uv[0]);      
+                    vertices.push(vec3(0, 0, 0)); ghostVertexCount++;
+
+                    vertices.push(ghost_pos[b]);
+                    vertices.push(vec3(nx, ny, nz));     
+                    vertices.push(ghost_uv[1]);      
+                    vertices.push(vec3(0, 0, 0)); ghostVertexCount++;
+
+                    vertices.push(ghost_pos[c]);
+                    vertices.push(vec3(nx, ny, nz));   
+                    vertices.push(ghost_uv[2]);      
+                    vertices.push(vec3(0, 0, 0)); ghostVertexCount++;
+
+                    vertices.push(ghost_pos[a]);
+                    vertices.push(vec3(nx, ny, nz));  
+                    vertices.push(ghost_uv[0]);      
+                    vertices.push(vec3(0, 0, 0)); ghostVertexCount++;
+
+                    vertices.push(ghost_pos[c]);
+                    vertices.push(vec3(nx, ny, nz));   
+                    vertices.push(ghost_uv[2]);      
+                    vertices.push(vec3(0, 0, 0)); ghostVertexCount++;
+
+                    vertices.push(ghost_pos[d]);
+                    vertices.push(vec3(nx, ny, nz));   
+                    vertices.push(ghost_uv[3]);      
+                    vertices.push(vec3(0, 0, 0)); ghostVertexCount++;
+                }
             }
         </script>
     </body>

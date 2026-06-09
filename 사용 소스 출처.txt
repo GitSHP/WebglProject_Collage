@@ -1,0 +1,13 @@
+이미지 파일
+087face.jpg = https://scpko.wikidot.com/scp-087
+escapemaze.jpg = AI 생성 이미지
+
+
+사운드 및 음악 파일
+grimyth - A darkness exists within us all =
+https://assetstore.unity.com/packages/audio/music/dark-horror-ambient-music-grimytheus-vol-2-290709
+
+2021_HJS_JumpScare_Medium_1_BV = 
+https://assetstore.unity.com/packages/audio/sound-fx/free-haunted-jump-scares-198111
+
+oliper18-scary-laugh-377526.mp3 = https://pixabay.com/sound-effects/search/scary-laugh/

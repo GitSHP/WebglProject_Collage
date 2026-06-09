@@ -15,6 +15,7 @@ uniform vec3 eyePos, lightDir;
 
 void main()
 {
+    // normal 벡터와 tangent 벡터는 현재 오브젝트 공간에 있기 때문에 월드 공간으로 변환하기 위한 다음과 같은 계산이 필요하다
     vec3 normal = normalize(transpose(inverse(mat3(worldMat))) * vNormal);
     vec3 tangent = normalize(transpose(inverse(mat3(worldMat))) * vTangent);
     vec3 bitangent = normalize(cross(normal, tangent));

@@ -39,6 +39,49 @@
                 height: 100%;
                 object-fit: cover;
             }
+
+            #helpOverlay {
+                position: fixed;
+                top: 0; left: 0;
+                width: 100%; height: 100%;
+                display: flex;              /* helpOverlay의 안에 자식 요소들이 flex가 되어 부모가 지정한 방향과 정렬 방식에 따라 배치*/
+                justify-content: flex-start;    /* 가로 방향 정렬 - flex-start = 기본값, 왼쪽부터 차례로 정렬*/
+                align-items: flex-start;    /* 세로 방향 정렬*/
+                z-index: 50;                /* 화면 맨 앞으로 나오도록 설정, xyz 축의 z축의 값을 변경한다고 생각하면 좋음*/
+            }
+
+            #helpBox {
+                background: rgba(0, 0, 0, 0.6); /* 검은색으로 반투명하게 설정, red green blua alpha 값, alpha = 불투명도*/
+                border: 1px solid #444;
+                border-radius: 8px;
+                padding: 5px 10px;
+                margin: 20px;
+                text-align: center;
+                color: #ccc;
+            }
+
+            #helpBox h2 {
+                color: #ff4444;
+                margin: 2px;
+                font-size: 18px;
+            }
+
+            #helpBox ul {
+                list-style: none;   /* 기본 bullet 점 제거*/
+                padding: 0;
+                margin: 0;
+                line-height: 1.8;   /*줄 간격 조정*/
+                text-align: left;   /*텍스트 왼쪽 정렬*/
+                font-size: 14px;
+            }
+
+            kbd {
+                background: #333;
+                border: 1px solid #666;
+                border-radius: 4px; /* 완전 사각형이 아니라 살짝 둥글게 */
+                padding: 2px 6px;   /* 위아래 쪽 패딩 2px, 양 옆 패딩 6px */
+                margin-right: 3px;
+            }
         </style>
     </head>
     <body>
@@ -52,11 +95,23 @@
             <img src = "Images/087face.jpg">
         </div>
 
+        <div id="helpOverlay">
+            <div id="helpBox">
+                <h2>조작법</h2>
+                <ul>
+                    <li><kbd>W</kbd> 앞으로 이동</li>
+                    <li><kbd>A</kbd> 왼쪽 회전</li>
+                    <li><kbd>S</kbd> 뒤로 이동</li>
+                    <li><kbd>D</kbd> 오른쪽 회전</li>
+                </ul>
+            </div>
+        </div>
+
         <audio id = "bgm" src = "sounds/grimyth - A darkness exists within us all.mp3" loop></audio> 
         <audio id = "jumpScareSound" src = "sounds/2021_HJS_JumpScare_Medium_1_BV.mp3"></audio>
         <audio id = "laughingSound" src = "sounds/oliper18-scary-laugh-377526.mp3"></audio>
-        <script type="text/javascript" src="shaders/initShaders2.js"></script>
-        <script type="text/javascript" src="MV.js"></script>
+        <script type="text/javascript" src= "shaders/initShaders2.js"></script>
+        <script type="text/javascript" src= "MV.js"></script>
         <script type="module">
             var gl;
             let vertices = [];
@@ -339,6 +394,8 @@
                     gl.useProgram(mainProgram);
                     gl.uniformMatrix4fv(projMatLoc, false, flatten(projectMatrix));
                 };
+
+                document.getElementById("helpOverlay").style.display = "flex";
             }
 
             function render() {

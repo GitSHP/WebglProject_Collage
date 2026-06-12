@@ -470,15 +470,15 @@
                         document.getElementById("laughingSound").play();
                     }
 
-                    // 마지막에 만나는 ghost에게 가까이 다가갔을 경우 점프스퀘어가 나오도록 함
+                    // 마지막에 만나는 ghost에게 가까이 다가갔을 경우 점프스케어가 나오도록 함
                     if(dist < ghostPara.disappearDist && ghostPara.x == 28 && ghostPara.z == 31.5){
                         ghostPara.visible = false;
 
-                        // 만약 점프스퀘어 화면이 나타난 적이 없다면 실행
+                        // 만약 점프스케어 화면이 나타난 적이 없다면 실행
                         if(!hasJumpScared){
                             hasJumpScared = true;
 
-                            // 점프스퀘어 시 소리와 함께 점프스퀘어 용 화면을 띄우고
+                            // 점프스케어 시 소리와 함께 점프스케어 용 화면을 띄우고
                             document.getElementById("jumpScareSound").play();
                             let jumpScareScreen = document.getElementById("jumpScareScreen");
                             jumpScareScreen.style.display = "block";

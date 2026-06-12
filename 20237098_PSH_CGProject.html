@@ -4,7 +4,7 @@
         <meta charset="utf-8">
         <title>20237098 박상현</title>
         <style>
-            body {
+            body { /* UI - AI 사용*/
                 margin: 0;
                 padding: 0;
                 overflow: hidden;
@@ -317,7 +317,7 @@
                 var sinTheta = Math.sin(0.1);
                 var cosTheta = Math.cos(0.1);
 
-                // AABB 충돌 감지 함수 (AI)
+                // AABB 충돌 감지 함수 (AI) - 여러 충돌 감지 기법 중 three.js 를 이용하는 방법도 있었지만 너무 복잡함..
                 // wallList 배열에 넣은 wallCol(x 값)과 wallRow(z 값) -> (벽이 차지하는 공간의 좌표 값)을 반복문을 돌면서
                 // isColliding 함수의 매개변수인 x, z 값 (카메라가 이동했을 때 카메라의 현재 x, z 좌표 값) 을 전달하고
                 // 그 값에 위에서 변수로 정의한 EYE_RADIUS의 값만큼 값을 추가한다.
@@ -329,6 +329,7 @@
                 // --> 카메라의 확장된 정사각형이 벽이 차지한 공간 z 좌표 안에 들어갔단 뜻이 된다.
                 // 따라서 카메라의 확장된 정사각형이 벽이 차지한 x, z 좌표 안에 들어가지 못하도록 한다
                 // 이런 방식으로 충돌을 감지해주는 충돌 감지 기법이 AABB 충돌 감지 기법이다
+                
                 function isColliding(x, z) {
                     for (const [wallcol, wallrow] of wallList) {
                         if (x + EYE_RADIUS > wallcol && x - EYE_RADIUS < wallcol + 2 && z + EYE_RADIUS > wallrow && z - EYE_RADIUS < wallrow + 2) 
@@ -799,7 +800,11 @@
 
             function generateWall(){ // 맵 벽
                 // 왼쪽, 위, 앞 면을 제외한 오른쪽, 아래 면은 보이지 않고, 뒷 면은 삼각형 하나만 렌더링되는 문제
-                // 법선 벡터 계산이 잘못되어있기 때문인 것으로 보임
+                // 오른손 좌표계에 의하면 
+                // 왼쪽 면의 법선 벡터는 (-1, 0, 0), 오른쪽 면의 법선 벡터는 (1, 0, 0) 처럼
+                // 다른 면들의 경우에도 동일하게 법선 벡터가 음수인 경우가 있는데 그 경우는 제대로 렌더링이 안되고
+                // 모두 법선 벡터가 양수, 즉 같은 방향을 보는 법선 벡터가 있지만 렌더링이 제대로 됨...;
+                // AI 한테 물어봐도 확실한 대답을 얻을 수 없었다
                 const mapWall_pos = [
                     vec3(0, 0, 0),  // 바닥 오른쪽 아래 좌표
                     vec3(2, 0, 0),  //      왼쪽 아래

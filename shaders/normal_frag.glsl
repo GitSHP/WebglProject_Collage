@@ -42,7 +42,7 @@ void main()
     // ambient term
     vec3 ambi = srcAmbi * matAmbi;
 
-    // 임시 코드 - 벽의 테두리에 검은색 선분을 그려 칸 마다 구별하기 쉽도록 함
+    // 임시 코드 - 벽의 테두리에 검은색 선분을 그려 칸 마다 구별하기 쉽도록 함 - AI
     // float edgeThreshold = 0.02;
     // if (fTexCoord.x < edgeThreshold || fTexCoord.x > 1.0 - edgeThreshold ||
     //    fTexCoord.y < edgeThreshold || fTexCoord.y > 1.0 - edgeThreshold) {

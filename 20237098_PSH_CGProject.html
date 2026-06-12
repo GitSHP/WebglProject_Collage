@@ -183,7 +183,7 @@
 
                 // Configure WebGL
                 gl.viewport(0, 0, canvas.width, canvas.height);
-                gl.clearColor(0.2, 0.2, 0.2, 1.0);
+                gl.clearColor(0.1, 0.1, 0.1, 1.0);
 
                 // Enable hidden surface removal
                 gl.enable(gl.DEPTH_TEST);
@@ -329,7 +329,7 @@
                 // --> 카메라의 확장된 정사각형이 벽이 차지한 공간 z 좌표 안에 들어갔단 뜻이 된다.
                 // 따라서 카메라의 확장된 정사각형이 벽이 차지한 x, z 좌표 안에 들어가지 못하도록 한다
                 // 이런 방식으로 충돌을 감지해주는 충돌 감지 기법이 AABB 충돌 감지 기법이다
-                
+
                 function isColliding(x, z) {
                     for (const [wallcol, wallrow] of wallList) {
                         if (x + EYE_RADIUS > wallcol && x - EYE_RADIUS < wallcol + 2 && z + EYE_RADIUS > wallrow && z - EYE_RADIUS < wallrow + 2) 

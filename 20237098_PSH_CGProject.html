@@ -525,19 +525,15 @@
                 // alert은 브라우저의 모든 실행을 멈추게 만드는 블로킹 함수임 - alert이 실행되면 다른 스크립트의 실행이 중단됨
                 // 확인을 누르면 예약되어 쌓였던 window.requestAnimationFrame(render);가 실행되고 다시 alert을 발생시킴
                 // 따라서 확인을 누르더라도 탈출 판정이 일어나게 되는 것
-                // 이를 방지하기 위해서 탈출 판정을 확인하는 플래그 변수를 추가하고 마지막에 함수를 빠져나오도록 return을 준다
-                if(isEscaped){
-                    return; 
-                } 
+                // 이를 방지하기 위해서 setTimeOut을 사용하여 특정 시간 뒤에 alert이 실행되도록 하고 마지막에 함수를 빠져나오도록 return을 준다
 
-                // 카메라가 탈출 지점에 도착하면 
+                // 카메라가 탈출 지점에 도착하면
                 if(eye[0] > 36 && eye[0] <= 40 && eye[2] > 38 && eye[2] <= 40){
-                    isEscaped = true;
-                    document.getElementById("bgm").pause();
-                    document.getElementById("escapeScreen").style.display = "block";
+                    document.getElementById("bgm").pause(); // 배경음악 중지
+                    document.getElementById("escapeScreen").style.display = "block";    // 탈출 사진이 화면을 막도록 설정
                     setTimeout(function(){
                         alert("탈출 성공!");
-                    }, 100);
+                    }, 100);    // setTimeOut을 통해서 0.1초 후에 alert이 실행되도록 함
                     return;
                 }
 

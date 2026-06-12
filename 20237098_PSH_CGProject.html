@@ -481,9 +481,8 @@
 
                             // 점프스케어 시 소리와 함께 점프스케어 용 화면을 띄우고
                             document.getElementById("jumpScareSound").play();
-                            let jumpScareScreen = document.getElementById("jumpScareScreen");
-                            jumpScareScreen.style.display = "block";
-
+                            document.getElementById("jumpScareScreen").style.display = "block";
+                            
                             // 처음에는 사진을 선명하게 띄웠다가 
                             jumpScareScreen.style.opacity = "1";
 
